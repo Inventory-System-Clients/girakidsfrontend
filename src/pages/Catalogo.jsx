@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
 import { Package, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
 import api from "../services/api";
+import Carrossel from "../components/Carrossel";
 import { useCart } from "../contexts/CartContext";
 import { Badge, Card, Dialog, Skeleton, cx } from "../components/ui";
 import { moeda, moedaUnitaria } from "../utils/format";
 
 const POR_PAGINA = 12;
+
+// Sem estoque, a imagem "fora de estoque" (quando houver) vem primeiro.
+const imagensDoProduto = (p) => {
+  const imagens = p.imagens?.length ? p.imagens : [p.imagemUrl].filter(Boolean);
+  return p.imagemUrl && p.imagemUrl !== imagens[0] ? [p.imagemUrl, ...imagens] : imagens;
+};
 
 function Quantidade({ produto }) {
   const { quantidadeDe, definirQuantidade } = useCart();
@@ -33,11 +40,7 @@ function CardProduto({ produto, onAbrir }) {
   return (
     <Card className="group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md" onClick={onAbrir}>
       <div className="relative aspect-square bg-gradient-to-b from-slate-100 to-slate-200">
-        {produto.imagemUrl ? (
-          <img src={produto.imagemUrl} alt={produto.nome} loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <Package className="absolute inset-0 m-auto h-12 w-12 text-slate-300" />
-        )}
+        <Carrossel compacto imagens={imagensDoProduto(produto)} alt={produto.nome} className="absolute inset-0" />
         {produto.destaque && (
           <span className="absolute right-2 bottom-2 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow">
             <Star className="h-3 w-3 fill-white" /> Mais vendido
@@ -174,9 +177,7 @@ export default function Catalogo() {
       <Dialog aberto={Boolean(detalhe)} onFechar={() => setDetalhe(null)} titulo={detalhe?.nome} descricao={detalhe?.categoria} tamanho="md">
         {detalhe && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="aspect-square overflow-hidden rounded-lg bg-muted">
-              {detalhe.imagemUrl && <img src={detalhe.imagemUrl} alt={detalhe.nome} className="h-full w-full object-cover" />}
-            </div>
+            <Carrossel imagens={imagensDoProduto(detalhe)} alt={detalhe.nome} className="aspect-square rounded-lg" />
             <div className="flex flex-col gap-2">
               <p className="text-sm text-muted-foreground">SKU {detalhe.sku}</p>
               {detalhe.descricao && <p className="text-sm">{detalhe.descricao}</p>}

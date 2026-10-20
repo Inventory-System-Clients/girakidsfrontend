@@ -26,9 +26,11 @@ api.interceptors.response.use(
 export const mensagemErro = (error, padrao = "Ocorreu um erro inesperado") =>
   error?.response?.data?.error || error?.message || padrao;
 
-// Envia imagem/PDF para o backend e devolve a URL pública.
-export const enviarArquivo = async (arquivo) => {
+// Envia imagem/PDF para o backend e devolve a URL pública. Imagens vão para
+// o Cloudinary (pasta: produtos | expedicao | notas) quando configurado.
+export const enviarArquivo = async (arquivo, pasta = "produtos") => {
   const dados = new FormData();
+  dados.append("pasta", pasta);
   dados.append("arquivo", arquivo);
   const { data } = await api.post("/arquivos", dados, {
     headers: { "Content-Type": "multipart/form-data" },

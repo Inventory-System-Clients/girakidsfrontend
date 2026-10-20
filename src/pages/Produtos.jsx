@@ -34,6 +34,79 @@ import { TIPOS_EMBALAGEM } from "../utils/status";
 const STATUS = { EM_ESTOQUE: "Em estoque", ESTOQUE_BAIXO: "Estoque baixo", SEM_ESTOQUE: "Sem estoque" };
 const corStatus = { EM_ESTOQUE: "success", ESTOQUE_BAIXO: "warning", SEM_ESTOQUE: "danger" };
 
+// Carrossel do produto: envia várias imagens direto pelo site (o backend
+// salva no Cloudinary), reordena e remove. A primeira é a capa.
+function GaleriaImagens({ imagens, onChange, desabilitado }) {
+  const toast = useToast();
+  const [enviando, setEnviando] = useState(0);
+  const atual = useRef(imagens);
+  atual.current = imagens;
+
+  const enviar = async (arquivos) => {
+    const lista = [...(arquivos || [])].filter((a) => a.type.startsWith("image/"));
+    if (!lista.length) return;
+    setEnviando(lista.length);
+    for (const arquivo of lista) {
+      try {
+        const url = await enviarArquivo(await comprimirImagem(arquivo), "produtos");
+        onChange([...atual.current, url]);
+      } catch (error) {
+        toast({ titulo: `Erro ao enviar ${arquivo.name}`, descricao: mensagemErro(error), tipo: "erro" });
+      } finally {
+        setEnviando((n) => n - 1);
+      }
+    }
+  };
+  const mover = (i, delta) => {
+    const nova = [...imagens];
+    const [item] = nova.splice(i, 1);
+    nova.splice(i + delta, 0, item);
+    onChange(nova);
+  };
+
+  return (
+    <div>
+      <p className="label">Imagens do produto (carrossel)</p>
+      <p className="mb-2 text-xs text-muted-foreground">A primeira imagem é a capa no catálogo. Arraste várias de uma vez; use as setas para reordenar.</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {imagens.map((url, i) => (
+          <div key={url} className="group relative overflow-hidden rounded-lg border border-border bg-muted">
+            <img src={url} alt="" className="aspect-square w-full object-cover" />
+            {i === 0 && <span className="absolute top-1 left-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-white">Capa</span>}
+            <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-1 text-white">
+              <button type="button" className="rounded px-1.5 hover:bg-white/20 disabled:opacity-30" disabled={i === 0} onClick={() => mover(i, -1)} aria-label="Mover para a esquerda">
+                ‹
+              </button>
+              <button type="button" className="rounded px-1.5 text-xs hover:bg-white/20" onClick={() => onChange(imagens.filter((_, j) => j !== i))}>
+                Remover
+              </button>
+              <button type="button" className="rounded px-1.5 hover:bg-white/20 disabled:opacity-30" disabled={i === imagens.length - 1} onClick={() => mover(i, 1)} aria-label="Mover para a direita">
+                ›
+              </button>
+            </div>
+          </div>
+        ))}
+        <label
+          className={cx(
+            "flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border p-2 text-center text-xs text-muted-foreground hover:border-primary",
+            desabilitado && "pointer-events-none opacity-50",
+          )}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            enviar(e.dataTransfer.files);
+          }}
+        >
+          <Upload className="h-6 w-6" />
+          {enviando ? `Enviando ${enviando}...` : "Adicionar imagens"}
+          <span>PNG, JPG ou WEBP</span>
+          <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => enviar(e.target.files)} />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function UploadImagem({ label, valor, onChange, desabilitado }) {
   const toast = useToast();
   const [enviando, setEnviando] = useState(false);
@@ -84,10 +157,10 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
   useEffect(() => {
     api.get("/parceiros", { params: { ativos: "true" } }).then(({ data }) => setFornecedores(data));
     if (novo) {
-      setP({ tipo: "SIMPLES", modoVenda: "PADRAO", precoVenda: "", custo: "", unidadesPacote: 1, pesoPacoteGramas: "", estoque: 0, estoqueMinimo: "", tipoEmbalagem: "", componentes: [], destaque: false });
+      setP({ tipo: "SIMPLES", modoVenda: "PADRAO", precoVenda: "", custo: "", unidadesPacote: 1, pesoPacoteGramas: "", estoque: 0, estoqueMinimo: "", tipoEmbalagem: "", componentes: [], destaque: false, imagens: [] });
     } else {
       api.get(`/produtos/${produtoId}`).then(({ data }) =>
-        setP({ ...data, precoVenda: String(data.precoVenda).replace(".", ","), custo: data.custo != null ? String(data.custo).replace(".", ",") : "", estoqueMinimo: data.estoqueMinimo ?? "", tipoEmbalagem: data.tipoEmbalagem || "" }),
+        setP({ ...data, imagens: data.imagens?.length ? data.imagens : data.imagemUrl ? [data.imagemUrl] : [], precoVenda: String(data.precoVenda).replace(".", ","), custo: data.custo != null ? String(data.custo).replace(".", ",") : "", estoqueMinimo: data.estoqueMinimo ?? "", tipoEmbalagem: data.tipoEmbalagem || "" }),
       );
     }
   }, [produtoId, novo]);
@@ -312,9 +385,9 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
 
         <section>
           <h3 className="mb-3 font-semibold">Imagens</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <UploadImagem label="Imagem em Estoque" valor={p.imagemUrl} onChange={set("imagemUrl")} desabilitado={!p.sku} />
-            <UploadImagem label="Imagem fora de Estoque" valor={p.imagemSemEstoqueUrl} onChange={set("imagemSemEstoqueUrl")} desabilitado={!p.sku} />
+          <GaleriaImagens imagens={p.imagens || []} onChange={(imagens) => setP({ ...p, imagens })} desabilitado={!p.sku} />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <UploadImagem label="Imagem fora de Estoque (opcional)" valor={p.imagemSemEstoqueUrl} onChange={set("imagemSemEstoqueUrl")} desabilitado={!p.sku} />
           </div>
           {!p.sku && <p className="mt-1 text-xs text-muted-foreground">Preencha o SKU primeiro para habilitar o upload de imagem</p>}
         </section>

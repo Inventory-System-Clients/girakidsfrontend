@@ -450,7 +450,7 @@ function NotaFiscalDialog({ pedido, onFechar, onFeito }) {
     if (!arquivo) return;
     setEnviando(true);
     try {
-      setUrl(await enviarArquivo(arquivo));
+      setUrl(await enviarArquivo(arquivo, "notas"));
     } catch (error) {
       toast({ titulo: "Erro ao enviar arquivo", descricao: mensagemErro(error), tipo: "erro" });
     } finally {
@@ -587,7 +587,7 @@ function ExpedirDialog({ pedido, onFechar, onFeito }) {
     if (arquivo.size > 15 * 1024 * 1024) return toast({ titulo: "Arquivo muito grande", descricao: "A imagem deve ter no máximo 15MB", tipo: "erro" });
     setProcessando(true);
     try {
-      setImagem(await enviarArquivo(await comprimirImagem(arquivo)));
+      setImagem(await enviarArquivo(await comprimirImagem(arquivo), "expedicao"));
     } catch {
       toast({ titulo: "Erro ao processar imagem", descricao: "Tente selecionar outra imagem", tipo: "erro" });
     } finally {
