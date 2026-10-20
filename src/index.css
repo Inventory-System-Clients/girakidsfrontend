@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* Tokens da loja original (shadcn): primária rosa, secundária azul. */
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --color-primary: hsl(349 89% 60%);
+  --color-primary-dark: hsl(349 80% 52%);
+  --color-primary-soft: hsl(349 100% 97%);
+  --color-secondary: hsl(199 89% 48%);
+  --color-background: hsl(210 40% 98%);
+  --color-foreground: hsl(222.2 84% 4.9%);
+  --color-muted: hsl(210 40% 96.1%);
+  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
+  --color-border: hsl(214.3 31.8% 91.4%);
+  --color-success: hsl(158 64% 52%);
+  --color-accent-cream: hsl(349 100% 92%);
+  --radius-card: 0.625rem;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+  * {
+    @apply border-border;
+  }
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+  }
+}
+
+@layer components {
+  .toy-pattern-bg {
+    background-color: #f8f9fa;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f43f5e' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  .gradient-primary {
+    background-image: linear-gradient(90deg, hsl(349 89% 60%), hsl(280 70% 65%));
+  }
+  .input {
+    @apply h-10 w-full rounded-md border border-border bg-white px-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted;
+  }
+  textarea.input {
+    @apply h-auto py-2;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-foreground;
+  }
+
+  /* Classes usadas pelas telas do Comercial herdadas do AgarraMais */
+  .card {
+    @apply rounded-xl border border-border bg-white p-6 shadow-sm;
+  }
+  .card-gradient {
+    @apply rounded-xl border border-primary/20 bg-gradient-to-br from-white to-primary-soft p-6 shadow-sm;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border-2 border-primary bg-white px-5 py-2.5 font-semibold text-primary transition hover:bg-primary-soft disabled:opacity-50;
+  }
+  .input-field {
+    @apply w-full rounded-lg border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .badge-success { @apply bg-emerald-100 text-emerald-700; }
+  .badge-warning { @apply bg-amber-100 text-amber-700; }
+  .badge-danger { @apply bg-red-100 text-red-700; }
+  .badge-info { @apply bg-sky-100 text-sky-700; }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
