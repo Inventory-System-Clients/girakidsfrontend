@@ -101,6 +101,7 @@ export default function Expedicao() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {data(p.createdAt)} · {METODOS_ENVIO[p.metodoEnvio] || "Entrega a definir"}
+                  {p.transportadoraNome && <span className="font-medium text-sky-700"> · {p.transportadoraNome}</span>}
                 </p>
               </div>
               <span onClick={(e) => e.stopPropagation()}>

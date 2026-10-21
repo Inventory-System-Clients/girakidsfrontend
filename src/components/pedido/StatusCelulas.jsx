@@ -36,8 +36,14 @@ export const CelulaMetodo = ({ pedido }) => {
 export const CelulaEnvio = ({ pedido }) => (
   <span className="inline-flex flex-col items-center">
     {METODOS_ENVIO[pedido.metodoEnvio] || "—"}
-    {["PAC", "SEDEX", "TRANSPORTADORA"].includes(pedido.metodoEnvio) && (
-      <span className="text-[11px] text-muted-foreground">{pedido.prazoEntregaDias ? `${pedido.prazoEntregaDias} dias úteis` : "-"}</span>
+    {pedido.metodoEnvio === "TRANSPORTADORA" ? (
+      <span className="max-w-32 truncate text-[11px] font-medium text-sky-700" title={pedido.transportadoraNome || ""}>
+        {pedido.transportadoraNome || "a definir"}
+      </span>
+    ) : (
+      ["PAC", "SEDEX"].includes(pedido.metodoEnvio) && (
+        <span className="text-[11px] text-muted-foreground">{pedido.prazoEntregaDias ? `${pedido.prazoEntregaDias} dias úteis` : "-"}</span>
+      )
     )}
   </span>
 );

@@ -25,7 +25,7 @@ import { FotosUpload } from "./Fotos";
 import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
 import { EditorMescla } from "../../pages/Checkout";
 import { data, hojeISO, lerNumero, moeda } from "../../utils/format";
-import { FORMAS_PAGAMENTO, nomeForma } from "../../utils/status";
+import { FORMAS_PAGAMENTO, METODOS_ENVIO, nomeForma } from "../../utils/status";
 import { gerarPdfPedido } from "../../utils/pdf";
 
 const FORMAS = Object.keys(FORMAS_PAGAMENTO);
@@ -83,6 +83,19 @@ function LiberarDialog({ pedido, modo, onFechar, onFeito }) {
       }
     >
       <div className="space-y-4">
+        <div className="rounded-lg border border-border p-3 text-sm">
+          <p>
+            <span className="text-muted-foreground">Entrega: </span>
+            <strong>{METODOS_ENVIO[pedido.metodoEnvio] || "A definir"}</strong>
+            {pedido.metodoEnvio === "TRANSPORTADORA" && (
+              <>
+                {" · "}
+                <strong className="text-sky-700">{pedido.transportadoraNome || "transportadora ainda não escolhida"}</strong>
+              </>
+            )}
+          </p>
+          {pedido.transportadoraObs && <p className="text-xs text-muted-foreground">Obs.: {pedido.transportadoraObs}</p>}
+        </div>
         <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
           <span className="text-muted-foreground">Total do pedido</span>
           <span className="text-right font-semibold">{moeda(pedido.total)}</span>

@@ -25,6 +25,7 @@ import EnderecoCampos from "../components/EnderecoCampos";
 import ClienteBusca from "../components/ClienteBusca";
 import { ClienteSelecionado, HistoricoCliente, MontarComIA } from "../components/checkout/Assistente";
 import { lerEscolhasGiraldo } from "../components/Giraldo";
+import SeletorTransportadora from "../components/checkout/SeletorTransportadora";
 import { hojeISO, lerNumero, moeda, moedaUnitaria, somenteDigitos } from "../utils/format";
 import { FORMAS_PAGAMENTO } from "../utils/status";
 import { gerarPdfPedido } from "../utils/pdf";
@@ -168,6 +169,8 @@ export default function Checkout({ modo = "pedido" }) {
   const [cliente, setCliente] = useState(() => (interno ? dadosDoUsuario(clienteSelecionado || {}) : dadosDoUsuario(usuario)));
   const [clienteId, setClienteId] = useState(() => clienteSelecionado?.id || null);
   const [mostrarIA, setMostrarIA] = useState(false);
+  const [transportadora, setTransportadora] = useState(null);
+  const [transportadoraObs, setTransportadoraObs] = useState("");
 
   const escolherCliente = (u) => {
     setClienteSelecionado(u);
@@ -252,6 +255,11 @@ export default function Checkout({ modo = "pedido" }) {
         parcelasCartao: config?.cartao ? parcelas : null,
         composicaoPagamento: forma === "MESCLA" ? mescla.map((l) => ({ ...l, valor: lerNumero(l.valor) })) : null,
         usarCredito,
+        transportadora:
+          metodoEnvio === "TRANSPORTADORA" && transportadora
+            ? { id: transportadora.id, nome: transportadora.nome, telefone: transportadora.whatsapp || transportadora.telefone, cidade: transportadora.cidadeBase, observacao: transportadora.observacao }
+            : null,
+        transportadoraObs: metodoEnvio === "TRANSPORTADORA" ? transportadoraObs : null,
         observacoes,
       };
       if (orcamento) {
@@ -506,6 +514,19 @@ export default function Checkout({ modo = "pedido" }) {
                 </button>
               ))}
             </div>
+            {interno && metodoEnvio === "TRANSPORTADORA" && (
+              <div className="mt-4">
+                <SeletorTransportadora
+                  uf={cliente.estado}
+                  cidade={cliente.cidade}
+                  pesoGramas={frete?.pesoGramas}
+                  selecionada={transportadora}
+                  onSelecionar={setTransportadora}
+                  observacao={transportadoraObs}
+                  onObservacao={setTransportadoraObs}
+                />
+              </div>
+            )}
           </Card>
 
           <Card className="p-5">

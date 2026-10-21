@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, Circle, FileDown, PackageCheck, Truck, Undo2 }
 import api, { mensagemErro } from "../services/api";
 import { Badge, Button, Card, Field, Spinner, Textarea, cx, useConfirm, useToast } from "../components/ui";
 import { FotosUpload } from "../components/pedido/Fotos";
+import { BotaoWhatsapp } from "../components/Whatsapp";
 import { carimbo, mascaraDocumento, pesoKg } from "../utils/format";
 import { METODOS_ENVIO, nomeForma } from "../utils/status";
 import { gerarPdfPedido } from "../utils/pdf";
@@ -141,7 +142,13 @@ export default function MontagemPedido() {
         <div className="space-y-1">
           <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Transportadora e documentos</p>
           <Linha rotulo="Transportadora">{pedido.transportadoraNome || "Nenhuma vinculada"}</Linha>
+          <Linha rotulo="Telefone transportadora">{pedido.transportadora?.telefone}</Linha>
           <Linha rotulo="Obs. transportadora">{pedido.transportadoraObs}</Linha>
+          {pedido.transportadora?.telefone && (
+            <BotaoWhatsapp variante="contorno" className="py-1 text-xs" telefone={pedido.transportadora.telefone} texto={`Olá! Aqui é da Gira Kids, sobre a coleta do pedido ${pedido.numeroFormatado}.`}>
+              WhatsApp da transportadora
+            </BotaoWhatsapp>
+          )}
           <Linha rotulo="Nota fiscal">{pedido.notaFiscalNumero}</Linha>
           <Linha rotulo="Rastreio">{pedido.codigoRastreio}</Linha>
           <Linha rotulo="Liberado por">{pedido.liberadoPor && `${pedido.liberadoPor} · ${carimbo(pedido.liberadoEm)}`}</Linha>
