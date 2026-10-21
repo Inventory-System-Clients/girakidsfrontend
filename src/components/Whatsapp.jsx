@@ -68,9 +68,9 @@ export function WhatsappFlutuante() {
       target="_blank"
       rel="noreferrer"
       aria-label="Falar com o comercial no WhatsApp"
-      className="no-print fixed right-4 bottom-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition hover:scale-105"
+      className="no-print fixed right-5 bottom-28 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition hover:scale-105"
     >
-      <IconeWhatsapp className="h-8 w-8" />
+      <IconeWhatsapp className="h-7 w-7" />
     </a>
   );
 }

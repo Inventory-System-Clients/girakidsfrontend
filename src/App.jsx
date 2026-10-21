@@ -10,6 +10,9 @@ import Login from "./pages/Login";
 import Registrar from "./pages/Registrar";
 import AlertasClientes from "./components/AlertasClientes";
 import { WhatsappFlutuante } from "./components/Whatsapp";
+import Giraldo from "./components/Giraldo";
+import { useAuth } from "./contexts/AuthContext";
+import { useLocation } from "react-router-dom";
 
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Pagamento = lazy(() => import("./pages/Pagamento"));
@@ -31,6 +34,15 @@ const Correios = lazy(() => import("./pages/comercial/Correios").then((m) => ({ 
 
 const Protegida = ({ permissoes, children }) => <PrivateRoute permissoes={permissoes}>{children}</PrivateRoute>;
 
+// Giraldo aparece para clientes e visitantes em todo o site; para a equipe,
+// só no catálogo (nas telas internas atrapalharia).
+function GiraldoNoSite() {
+  const { interno } = useAuth();
+  const { pathname } = useLocation();
+  if (interno && !(pathname === "/" || pathname === "/catalogo" || pathname.startsWith("/produto/"))) return null;
+  return <Giraldo />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -41,6 +53,7 @@ export default function App() {
               <Header />
               <AlertasClientes />
               <WhatsappFlutuante />
+              <GiraldoNoSite />
               <Suspense
                 fallback={
                   <div className="flex min-h-[50vh] items-center justify-center">

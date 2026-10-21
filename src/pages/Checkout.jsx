@@ -24,6 +24,7 @@ import {
 import EnderecoCampos from "../components/EnderecoCampos";
 import ClienteBusca from "../components/ClienteBusca";
 import { ClienteSelecionado, HistoricoCliente, MontarComIA } from "../components/checkout/Assistente";
+import { lerEscolhasGiraldo } from "../components/Giraldo";
 import { hojeISO, lerNumero, moeda, moedaUnitaria, somenteDigitos } from "../utils/format";
 import { FORMAS_PAGAMENTO } from "../utils/status";
 import { gerarPdfPedido } from "../utils/pdf";
@@ -182,11 +183,13 @@ export default function Checkout({ modo = "pedido" }) {
   const [observacoes, setObservacoes] = useState("");
   const [desconto, setDesconto] = useState("");
   const [freteAdicional, setFreteAdicional] = useState("");
-  const [metodoEnvio, setMetodoEnvio] = useState("");
+  // Cliente que veio do Giraldo já chega com entrega/pagamento escolhidos.
+  const escolhasGiraldo = interno ? {} : lerEscolhasGiraldo();
+  const [metodoEnvio, setMetodoEnvio] = useState(escolhasGiraldo.metodoEnvio || "");
   const [frete, setFrete] = useState(null);
   const [cotando, setCotando] = useState(false);
   const [opcoes, setOpcoes] = useState(null);
-  const [forma, setForma] = useState(interno ? "A_DEFINIR" : "");
+  const [forma, setForma] = useState(interno ? "A_DEFINIR" : escolhasGiraldo.formaPagamento || "");
   const [parcelas, setParcelas] = useState(1);
   const [mescla, setMescla] = useState([]);
   const [usarCredito, setUsarCredito] = useState(false);
@@ -516,7 +519,7 @@ export default function Checkout({ modo = "pedido" }) {
                 return (
                   <button
                     key={f.codigo}
-                    disabled={!f.disponivel}
+                    disabled={!f.disponivel || (f.somenteEnvios && !f.somenteEnvios.includes(metodoEnvio))}
                     onClick={() => {
                       setForma(f.codigo);
                       if (f.codigo === "MESCLA" && !mescla.length) setMescla([{ metodo: "PIX_PRESENCIAL", valor: "", vencimento: hojeISO() }]);
@@ -529,7 +532,17 @@ export default function Checkout({ modo = "pedido" }) {
                     <Icone className="h-5 w-5 text-primary" />
                     <span className="flex-1">
                       <span className="block text-sm font-medium">{f.nome}</span>
-                      <span className="text-xs text-muted-foreground">{f.cartao ? "Taxas variáveis" : f.taxa ? `+ ${String(f.taxa).replace(".", ",")}%` : "Sem taxa"}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {f.combinar
+                          ? f.somenteEnvios
+                            ? "Para retirada ou transportadora"
+                            : "O comercial envia a forma de pagamento"
+                          : f.cartao
+                            ? "Taxas variáveis"
+                            : f.taxa
+                              ? `+ ${String(f.taxa).replace(".", ",")}%`
+                              : "Sem taxa"}
+                      </span>
                     </span>
                     {f.admin && <Badge variant="outline">ADM</Badge>}
                   </button>
