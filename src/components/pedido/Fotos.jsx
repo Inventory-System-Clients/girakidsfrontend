@@ -6,7 +6,7 @@ import { comprimirImagem } from "../../utils/format";
 import { cx, useToast } from "../ui";
 
 // Visualizador em tela cheia (setas, Esc, arrastar no celular).
-export function Visualizador({ fotos, inicial, onFechar }) {
+export function Visualizador({ fotos, inicial, onFechar, pretoBranco = false }) {
   const [i, setI] = useState(inicial);
   const toqueX = useRef(null);
   const ir = (d) => setI((x) => (x + d + fotos.length) % fotos.length);
@@ -22,7 +22,7 @@ export function Visualizador({ fotos, inicial, onFechar }) {
       }}
       tabIndex={-1}
     >
-      <img src={fotos[i]} alt="" className="max-h-[90dvh] max-w-[95vw] object-contain" onClick={(e) => e.stopPropagation()} />
+      <img src={fotos[i]} alt="" className={`max-h-[90dvh] max-w-[95vw] object-contain${pretoBranco ? " grayscale" : ""}`} onClick={(e) => e.stopPropagation()} />
       <button className="absolute top-4 right-4 rounded-full bg-white/15 p-2 text-white" onClick={onFechar} aria-label="Fechar">
         <X className="h-6 w-6" />
       </button>

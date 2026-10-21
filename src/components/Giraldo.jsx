@@ -44,7 +44,11 @@ function CartaoProduto({ produto, onAdicionar }) {
   return (
     <div className="w-44 shrink-0 overflow-hidden rounded-xl border border-border bg-white shadow-sm">
       <div className="aspect-square bg-muted">
-        {produto.imagemUrl ? <img src={produto.imagemUrl} alt={produto.nome} className="h-full w-full object-cover" /> : <Package className="m-auto mt-12 h-10 w-10 text-slate-300" />}
+        {produto.imagemUrl ? (
+          <img src={produto.imagemUrl} alt={produto.nome} className={cx("h-full w-full object-cover", !produto.disponivel && !produto.temImagemEsgotado && "grayscale")} />
+        ) : (
+          <Package className="m-auto mt-12 h-10 w-10 text-slate-300" />
+        )}
       </div>
       <div className="space-y-1 p-2">
         <p className="line-clamp-2 text-xs font-semibold">{produto.nome}</p>

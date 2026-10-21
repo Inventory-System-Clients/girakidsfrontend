@@ -12,6 +12,10 @@ import { moeda, moedaUnitaria } from "../utils/format";
 const POR_PAGINA = 12;
 
 // Sem estoque, a imagem "fora de estoque" (quando houver) vem primeiro.
+// Esgotado sem arte própria de esgotado (ou com a mesma do estoque): foto em
+// preto e branco.
+const pretoEBranco = (p) => !p.disponivel && !p.temImagemEsgotado;
+
 const imagensDoProduto = (p) => {
   const imagens = p.imagens?.length ? p.imagens : [p.imagemUrl].filter(Boolean);
   return p.imagemUrl && p.imagemUrl !== imagens[0] ? [p.imagemUrl, ...imagens] : imagens;
@@ -43,7 +47,7 @@ function CardProduto({ produto, onAbrir }) {
   return (
     <Card className="group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md" onClick={onAbrir}>
       <div className="relative aspect-square bg-gradient-to-b from-slate-100 to-slate-200">
-        <Carrossel compacto imagens={imagensDoProduto(produto)} alt={produto.nome} className="absolute inset-0" />
+        <Carrossel compacto imagens={imagensDoProduto(produto)} alt={produto.nome} className="absolute inset-0" pretoBranco={pretoEBranco(produto)} />
         {produto.destaque && (
           <span className="absolute right-2 bottom-2 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow">
             <Star className="h-3 w-3 fill-white" /> Mais vendido
@@ -225,7 +229,7 @@ export default function Catalogo() {
         {detalhe && (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Carrossel imagens={imagensDoProduto(detalhe)} alt={detalhe.nome} className="aspect-square rounded-lg" onAmpliar={setAmpliada} />
+              <Carrossel imagens={imagensDoProduto(detalhe)} alt={detalhe.nome} className="aspect-square rounded-lg" onAmpliar={setAmpliada} pretoBranco={pretoEBranco(detalhe)} />
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={() => setAmpliada(0)} disabled={!imagensDoProduto(detalhe).length}>
                   <Maximize2 className="h-4 w-4" /> Ampliar
@@ -253,7 +257,7 @@ export default function Catalogo() {
           </div>
         )}
       </Dialog>
-      {detalhe && ampliada != null && <Visualizador fotos={imagensDoProduto(detalhe)} inicial={ampliada} onFechar={() => setAmpliada(null)} />}
+      {detalhe && ampliada != null && <Visualizador fotos={imagensDoProduto(detalhe)} inicial={ampliada} onFechar={() => setAmpliada(null)} pretoBranco={pretoEBranco(detalhe)} />}
     </div>
   );
 }
