@@ -49,6 +49,7 @@ function BannerForm({ banner, categorias, onFechar, onSalvo }) {
   const [produtos, setProdutos] = useState([]);
   const [buscaProduto, setBuscaProduto] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const faixa = useLayoutBanner() === "FAIXA";
   const set = (c) => (e) => setB({ ...b, [c]: e?.target ? e.target.value : e });
 
   useEffect(() => {
@@ -91,8 +92,8 @@ function BannerForm({ banner, categorias, onFechar, onSalvo }) {
     >
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <UploadArte label="Arte (computador)" dica="Proporção 3:1, ex.: 1800 × 600 px" valor={b.imagemUrl} onChange={set("imagemUrl")} />
-          <UploadArte label="Arte para celular (opcional)" dica="Proporção 16:9, ex.: 1200 × 675 px" valor={b.imagemMobileUrl} onChange={set("imagemMobileUrl")} />
+          <UploadArte label="Arte (computador)" dica={faixa ? "Faixa no topo: 2400 × 400 px (proporção 6:1)" : "Proporção 3:1, ex.: 1800 × 600 px"} valor={b.imagemUrl} onChange={set("imagemUrl")} />
+          <UploadArte label="Arte para celular (opcional)" dica={faixa ? "Faixa no celular: 1200 × 430 px (proporção 2,8:1)" : "Proporção 16:9, ex.: 1200 × 675 px"} valor={b.imagemMobileUrl} onChange={set("imagemMobileUrl")} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Texto do botão">
