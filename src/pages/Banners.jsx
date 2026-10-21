@@ -199,7 +199,7 @@ export default function Banners() {
   const destino = (b) => (b.produtoId ? "Produto" : b.categoria ? `Categoria: ${b.categoria}` : b.busca ? `Busca: "${b.busca}"` : "Sem botão");
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto max-w-6xl px-4 py-6">
       <PageHeader titulo="Banners do catálogo" subtitulo="Destaques no topo do catálogo: trocam sozinhos a cada 10 segundos, com botão para uma categoria, busca ou produto.">
         <Button onClick={() => setForm(null)}>
           <Plus className="h-4 w-4" /> Novo banner

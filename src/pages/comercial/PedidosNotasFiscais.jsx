@@ -330,7 +330,7 @@ export function PedidosNotasFiscais() {
     <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="container-app px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title="📑 Pedidos e Notas Fiscais"
           subtitle="Controle de pedidos, notas fiscais e coletas do time comercial"

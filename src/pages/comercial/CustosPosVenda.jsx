@@ -118,7 +118,7 @@ export default function CustosPosVenda() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="container-app py-6">
       <PageHeader titulo="Custos pós-venda" subtitulo="Custos extras de pedidos já finalizados (reenvio, avaria, troca...). Entram como custo do pedido na receita líquida do Time Financeiro.">
         <Button onClick={() => setNovo(true)}>
           <Plus className="h-4 w-4" /> Novo custo

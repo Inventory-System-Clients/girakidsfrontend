@@ -798,7 +798,7 @@ export default function Produtos() {
     carregarCategorias();
   }, []);
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="container-app py-6">
       <PageHeader titulo="Gerenciamento de Produtos" subtitulo="Adicione, edite ou arquive produtos do catálogo" />
       <Tabs className="mb-4" abas={[{ value: "produtos", label: "Gerenciar Produtos" }, { value: "categorias", label: "Categorias" }]} ativa={aba} onChange={setAba} />
       {aba === "produtos" ? <GerenciarProdutos categorias={categorias} /> : <Categorias categorias={categorias} recarregar={carregarCategorias} />}

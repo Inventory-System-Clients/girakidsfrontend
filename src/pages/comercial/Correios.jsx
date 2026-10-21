@@ -241,7 +241,7 @@ export function Correios() {
     <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="container-app px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title="Correios"
           subtitle="Pedidos da loja Gira Kids → postagem no VIPP com etiqueta e declaração em PDF"

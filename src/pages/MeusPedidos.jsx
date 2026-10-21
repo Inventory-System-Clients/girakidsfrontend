@@ -30,7 +30,7 @@ export default function MeusPedidos() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="container-app py-6">
       <PageHeader titulo="Meus Pedidos" subtitulo="Acompanhe seus pedidos realizados na Gira Kids." />
       {!pedidos && <Skeleton className="h-40" />}
       {pedidos?.length === 0 && (

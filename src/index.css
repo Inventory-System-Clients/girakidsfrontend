@@ -15,6 +15,9 @@
   --color-success: hsl(158 64% 52%);
   --color-accent-cream: hsl(349 100% 92%);
   --radius-card: 0.625rem;
+  /* Telas grandes (rem em media query = 16px fixos) */
+  --breakpoint-3xl: 105rem;
+  --breakpoint-4xl: 137.5rem;
 }
 
 @layer base {
@@ -30,7 +33,23 @@
   }
 }
 
+/* Telas grandes: tudo cresce um pouco (Tailwind usa rem), sem sobrar margem
+   branca enorme nas laterais. */
+@media (min-width: 1680px) {
+  html { font-size: 17px; }
+}
+@media (min-width: 2200px) {
+  html { font-size: 19px; }
+}
+@media (min-width: 3000px) {
+  html { font-size: 23px; }
+}
+
 @layer components {
+  /* Container das telas: ocupa a largura com margem proporcional. */
+  .container-app {
+    @apply mx-auto w-full max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-12;
+  }
   .toy-pattern-bg {
     background-color: #f8f9fa;
     background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f43f5e' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");

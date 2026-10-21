@@ -12,7 +12,6 @@ import { moeda, moedaUnitaria } from "../utils/format";
 const CHAVE_CONVERSA = "girakids_giraldo_conversa";
 const CHAVE_ESTADO = "girakids_giraldo_estado";
 const CHAVE_ABERTO = "girakids_giraldo_aberto";
-const CHAVE_BALAO = "girakids_giraldo_balao_visto";
 
 const ler = (chave, padrao) => {
   try {
@@ -28,6 +27,9 @@ const gravar = (chave, valor) => {
     // sem armazenamento: a conversa vale só nesta tela
   }
 };
+
+const BALAO_VISIVEL_MS = 10000;
+const BALAO_INTERVALO_MS = 45000;
 
 const BOAS_VINDAS = {
   role: "assistant",
@@ -194,7 +196,12 @@ export default function Giraldo() {
   const [estado, setEstado] = useState(() => ler(CHAVE_ESTADO, {}));
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
-  const [balao, setBalao] = useState(() => !ler(CHAVE_BALAO, false));
+  // Balão "Posso te ajudar?": aparece ao carregar, some sozinho e volta de
+  // tempos em tempos. Fechado no X, fica fechado até recarregar a página
+  // (estado só em memória).
+  const [balao, setBalao] = useState(false);
+  const [balaoDispensado, setBalaoDispensado] = useState(false);
+  const jaApareceu = useRef(false);
   const [whatsapp, setWhatsapp] = useState("5511942058445");
   const fim = useRef(null);
   const carrinhoRef = useRef(cart.itens);
@@ -207,10 +214,29 @@ export default function Giraldo() {
     if (aberto) fim.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens, aberto, pensando]);
   useEffect(() => {
-    if (!balao) return undefined;
-    const t = setTimeout(() => setBalao(false), 9000);
-    return () => clearTimeout(t);
-  }, [balao]);
+    if (aberto || balaoDispensado) {
+      setBalao(false);
+      return undefined;
+    }
+    let mostrar;
+    let esconder;
+    const ciclo = (espera) => {
+      mostrar = setTimeout(() => {
+        jaApareceu.current = true;
+        setBalao(true);
+        esconder = setTimeout(() => {
+          setBalao(false);
+          ciclo(BALAO_INTERVALO_MS);
+        }, BALAO_VISIVEL_MS);
+      }, espera);
+    };
+    // Na primeira vez aparece logo; depois de fechar o chat, espera o intervalo.
+    ciclo(jaApareceu.current ? BALAO_INTERVALO_MS : 2500);
+    return () => {
+      clearTimeout(mostrar);
+      clearTimeout(esconder);
+    };
+  }, [aberto, balaoDispensado]);
 
   const adicionarMensagem = (m) => setMensagens((lista) => [...lista, m]);
 
@@ -329,7 +355,7 @@ export default function Giraldo() {
         <div className="fixed right-4 bottom-4 z-[45] flex flex-col items-end gap-2">
           {balao && (
             <div className="relative max-w-56 rounded-2xl rounded-br-sm border border-blue-200 bg-white px-3 py-2 text-sm shadow-lg">
-              <button type="button" className="absolute -top-2 -right-2 rounded-full bg-white p-0.5 shadow" onClick={() => (setBalao(false), gravar(CHAVE_BALAO, true))} aria-label="Fechar aviso">
+              <button type="button" className="absolute -top-2 -right-2 rounded-full bg-white p-0.5 shadow" onClick={() => setBalaoDispensado(true)} aria-label="Fechar aviso">
                 <X className="h-3 w-3" />
               </button>
               <strong className="text-blue-700">Olá! Eu sou o Giraldo.</strong> Posso te ajudar com a sua compra? 😊
@@ -340,7 +366,6 @@ export default function Giraldo() {
             onClick={() => {
               setAberto(true);
               setBalao(false);
-              gravar(CHAVE_BALAO, true);
             }}
             className="group relative h-16 w-16 rounded-full shadow-xl ring-4 ring-blue-600 transition hover:scale-105 sm:h-[72px] sm:w-[72px]"
             aria-label="Abrir o assistente Giraldo"

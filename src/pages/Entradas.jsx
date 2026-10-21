@@ -480,7 +480,7 @@ export default function Entradas() {
   const fornecedores = parceiros.filter((p) => p.ativo);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="container-app py-6">
       <PageHeader titulo="Entradas e parceiros" subtitulo="Controle entregas por fornecedor, custo de reposição e histórico de custos." />
       <Tabs className="mb-4" abas={[{ value: "resumo", label: "Resumo" }, { value: "recebimentos", label: "Recebimentos" }, { value: "parceiros", label: "Parceiros" }]} ativa={aba} onChange={setAba} />
       {aba === "resumo" && (

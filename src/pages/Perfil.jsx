@@ -42,7 +42,7 @@ export default function Perfil() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
+    <div className="mx-auto max-w-4xl px-4 py-6">
       <PageHeader titulo="Meu Perfil" subtitulo="Gerencie seus dados de cadastro e segurança da conta" voltar={!trocaObrigatoria} />
       {trocaObrigatoria && <p className="mb-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">Por segurança, defina uma nova senha para continuar usando o sistema.</p>}
       <Card className="mb-6 p-5">

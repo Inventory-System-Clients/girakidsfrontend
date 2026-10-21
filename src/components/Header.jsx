@@ -142,7 +142,7 @@ export function Header() {
 
   return (
     <header className="no-print sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4">
+      <div className="container-app flex h-16 items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-2">
           <img src="/logo.webp" alt="" className="h-11 w-11 object-contain" />
           <span className="text-lg font-semibold">Gira Kids</span>

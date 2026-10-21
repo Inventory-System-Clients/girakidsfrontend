@@ -330,7 +330,7 @@ export default function Checkout({ modo = "pedido" }) {
   // itens frequentes ou IA a partir da mensagem dele).
   if (!itens.length && interno) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader titulo={orcamento ? "Geração de Orçamentos" : "Checkout"} subtitulo="Comece pelo cliente: copie o último pedido dele, adicione o que ele costuma comprar ou cole a mensagem para a IA montar.">
           <CarregarPedido />
         </PageHeader>
@@ -365,7 +365,7 @@ export default function Checkout({ modo = "pedido" }) {
 
   if (!itens.length) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="container-app py-8">
         <PageHeader titulo={orcamento ? "Geração de Orçamentos" : "Checkout"} subtitulo={orcamento ? "Monte pedidos administrativos, gere o PDF e salve o código para reaproveitar no checkout." : "Revise seu pedido e finalize a compra"}>
           <CarregarPedido />
         </PageHeader>
@@ -387,7 +387,7 @@ export default function Checkout({ modo = "pedido" }) {
   const formasVisiveis = (opcoes?.formas || []).filter((f) => f.codigo !== "MESCLA" || interno);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="container-app py-8">
       <PageHeader titulo={orcamento ? "Geração de Orçamentos" : "Checkout"} subtitulo={orcamento ? "Monte pedidos administrativos, gere o PDF e salve o código para reaproveitar no checkout." : "Revise seu pedido e finalize a compra"} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">

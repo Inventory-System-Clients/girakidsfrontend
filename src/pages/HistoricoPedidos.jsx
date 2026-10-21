@@ -180,7 +180,7 @@ export default function HistoricoPedidos() {
   };
 
   return (
-    <div className="mx-auto max-w-[96rem] px-4 py-6">
+    <div className="container-app py-6">
       <PageHeader titulo="Histórico de Pedidos" subtitulo="Gerencie todos os pedidos realizados na plataforma" />
 
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

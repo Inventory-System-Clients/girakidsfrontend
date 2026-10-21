@@ -652,7 +652,7 @@ export default function Dashboard() {
   const [atualizado] = useState(() => new Date());
 
   return (
-    <div className="mx-auto max-w-[96rem] px-4 py-6">
+    <div className="container-app py-6">
       <PageHeader
         titulo="Visão executiva de pedidos expedidos"
         subtitulo="Leitura consolidada de caixa, recebíveis, margem, estoque e operação."

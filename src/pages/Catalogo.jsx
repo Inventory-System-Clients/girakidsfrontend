@@ -159,7 +159,7 @@ export default function Catalogo() {
         <p className="mt-1 text-sm text-muted-foreground">Encontre facilmente o que procura</p>
       </section>
 
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-8 lg:grid-cols-[17rem_1fr]">
+      <div className="container-app grid grid-cols-1 gap-6 py-8 lg:grid-cols-[17rem_1fr] 2xl:grid-cols-[19rem_1fr]">
         <aside>
           <Card className="p-4 lg:sticky lg:top-20">
             <p className="mb-3 flex items-center gap-2 font-semibold">
@@ -196,7 +196,7 @@ export default function Catalogo() {
             <span className="font-semibold text-foreground">{dados?.total ?? "..."}</span> produtos encontrados
           </Card>
 
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6">
             {!dados && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="aspect-[3/5]" />)}
             {dados?.produtos.map((p) => (
               <CardProduto key={p.id} produto={p} onAbrir={() => abrirDetalhe(p)} />

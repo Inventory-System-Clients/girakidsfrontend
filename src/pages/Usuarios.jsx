@@ -212,7 +212,7 @@ export default function Usuarios() {
   }, [busca]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="container-app py-6">
       <PageHeader titulo="Gerenciamento de Usuários" subtitulo="Adicione, edite ou gerencie usuários da plataforma." />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-72">
