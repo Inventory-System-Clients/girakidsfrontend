@@ -76,7 +76,7 @@ function LiberarDialog({ pedido, modo, onFechar, onFeito }) {
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button variant={liberar ? "primary" : "success"} loading={enviando} onClick={enviar}>
+          <Button variant={liberar ? "info" : "success"} loading={enviando} onClick={enviar}>
             {liberar ? "Liberar para expedição" : quitar ? "Quitar pendência" : "Confirmar pagamento"}
           </Button>
         </>
@@ -125,7 +125,7 @@ function LiberarDialog({ pedido, modo, onFechar, onFeito }) {
             </Field>
           </div>
         )}
-        <Field label={liberar ? "Observação da liberação" : "Observação da quitação"} dica="Registre contexto operacional para rastreabilidade">
+        <Field label={`${liberar ? "Observação da liberação" : "Observação da quitação"} (opcional)`} dica="Pode deixar em branco">
           <Textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} />
         </Field>
       </div>
@@ -782,10 +782,11 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
             { label: "Ver pedido", icone: Eye, onClick: () => setVerId(pedido.id) },
             { label: "Baixar PDF", icone: FileDown, onClick: baixarPdf },
             contexto === "vendas" && ativo && !expedido && pode("VENDAS") && { label: "Editar pedido", icone: Pencil, onClick: () => comCompleto("editar") },
-            contexto === "vendas" && ativo && pedido.statusVendas === "AGUARDANDO" && financeiro && { label: "Liberar para expedição", icone: ClipboardCheck, onClick: () => comCompleto("liberar") },
+            contexto === "vendas" && ativo && pedido.statusVendas === "AGUARDANDO" && financeiro && { label: "Liberar para expedição", icone: ClipboardCheck, cor: "font-semibold text-blue-700 hover:bg-blue-50", onClick: () => comCompleto("liberar") },
             contexto === "vendas" && ativo && pedido.statusFinanceiro === "AGUARDANDO_PAGAMENTO" && financeiro && {
               label: pedido.pendenciaStatus === "ABERTA" ? "Quitar pendência" : "Confirmar pagamento",
               icone: CheckCircle2,
+              cor: "font-semibold text-emerald-700 hover:bg-emerald-50",
               onClick: () => comCompleto("pagar"),
             },
             contexto === "vendas" && ativo && pedido.statusFinanceiro === "AGUARDANDO_PAGAMENTO" && financeiro && { label: "Registrar recebimento", icone: HandCoins, onClick: () => comCompleto("recebimento") },

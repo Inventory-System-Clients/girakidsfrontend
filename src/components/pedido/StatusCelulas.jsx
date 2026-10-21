@@ -1,6 +1,8 @@
-import { Badge } from "../ui";
+import { cx } from "../ui";
 import { carimbo, data, moeda } from "../../utils/format";
-import { EXPEDICAO, FINANCEIRO, FORMAS_PAGAMENTO, METODOS_ENVIO, VENDAS } from "../../utils/status";
+import { COR_STATUS, EXPEDICAO, FINANCEIRO, FORMAS_PAGAMENTO, METODOS_ENVIO, VENDAS } from "../../utils/status";
+
+const Pilula = ({ cor, children }) => <span className={cx("inline-block rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap shadow-sm", cor)}>{children}</span>;
 
 const Carimbo = ({ quem, quando }) =>
   quando ? (
@@ -53,9 +55,9 @@ export const CelulaFinanceiro = ({ pedido }) =>
     "-"
   ) : (
     <span className="inline-flex flex-col items-center">
-      <span className={pedido.statusFinanceiroEfetivo === "ATRASADO" ? "font-semibold text-red-600" : ""}>{FINANCEIRO[pedido.statusFinanceiroEfetivo]}</span>
+      <Pilula cor={COR_STATUS.financeiro[pedido.statusFinanceiroEfetivo]}>{FINANCEIRO[pedido.statusFinanceiroEfetivo]}</Pilula>
       {pedido.statusFinanceiro === "PAGO" && <Carimbo quem={pedido.pagoPor} quando={pedido.pagoEm} />}
-      {pedido.pendenciaStatus === "ABERTA" && <span className="text-[11px] text-amber-700">em aberto {moeda(pedido.pendenciaValor)}</span>}
+      {pedido.pendenciaStatus === "ABERTA" && <span className="text-[11px] font-semibold text-amber-800">em aberto {moeda(pedido.pendenciaValor)}</span>}
     </span>
   );
 
@@ -64,9 +66,7 @@ export const CelulaVendas = ({ pedido }) =>
     "-"
   ) : (
     <span className="inline-flex flex-col items-center gap-0.5">
-      <Badge variant="outline" className="bg-white">
-        {VENDAS[pedido.statusVendas]}
-      </Badge>
+      <Pilula cor={COR_STATUS.vendas[pedido.statusVendas]}>{VENDAS[pedido.statusVendas]}</Pilula>
       {pedido.statusVendas === "LIBERADO" && <Carimbo quem={pedido.liberadoPor} quando={pedido.liberadoEm} />}
     </span>
   );
@@ -76,11 +76,13 @@ export const CelulaExpedicao = ({ pedido }) =>
     "-"
   ) : (
     <span className="inline-flex flex-col items-center">
-      {pedido.statusExpedicao === "NAO_INICIADO"
-        ? "-"
-        : pedido.statusExpedicao === "MONTAGEM" && pedido.montagemConcluidaEm
-          ? "Montagem concluída"
-          : EXPEDICAO[pedido.statusExpedicao]}
+      {pedido.statusExpedicao === "NAO_INICIADO" ? (
+        "-"
+      ) : pedido.statusExpedicao === "MONTAGEM" && pedido.montagemConcluidaEm ? (
+        <Pilula cor={COR_STATUS.expedicao.MONTADO}>Montagem concluída</Pilula>
+      ) : (
+        <Pilula cor={COR_STATUS.expedicao[pedido.statusExpedicao]}>{EXPEDICAO[pedido.statusExpedicao]}</Pilula>
+      )}
       {pedido.statusExpedicao === "EXPEDIDO" && <Carimbo quem={pedido.expedidoPor} quando={pedido.expedidoEm} />}
     </span>
   );

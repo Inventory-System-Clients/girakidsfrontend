@@ -25,7 +25,8 @@ export const cx = (...classes) => classes.filter(Boolean).join(" ");
 const VARIANTES = {
   primary: "bg-primary text-white hover:bg-primary-dark shadow-sm",
   secondary: "bg-secondary text-white hover:brightness-95 shadow-sm",
-  success: "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm",
+  success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
+  info: "bg-blue-600 text-white hover:bg-blue-700 shadow-sm",
   outline: "border border-border bg-white text-foreground hover:bg-muted",
   ghost: "text-foreground hover:bg-muted",
   danger: "bg-red-500 text-white hover:bg-red-600 shadow-sm",
@@ -409,6 +410,7 @@ export function RowMenu({ itens }) {
                 className={cx(
                   "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted disabled:opacity-40",
                   item.perigo && "text-red-600",
+                  item.cor,
                 )}
               >
                 {item.icone && <item.icone className="h-4 w-4" />}
