@@ -1,7 +1,13 @@
 import axios from "axios";
 
+// Aceita VITE_API_URL com ou sem "/api" e com barra no fim.
+const urlApi = () => {
+  const base = String(import.meta.env.VITE_API_URL || "http://localhost:3001/api").trim().replace(/\/+$/, "");
+  return /\/api$/.test(base) ? base : `${base}/api`;
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
+  baseURL: urlApi(),
   headers: { "Content-Type": "application/json" },
 });
 
