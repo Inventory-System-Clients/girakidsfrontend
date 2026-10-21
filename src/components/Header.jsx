@@ -16,8 +16,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { Button, Popover, cx } from "./ui";
 import { moeda } from "../utils/format";
+import { useAlertasRecebimentos } from "./recebimentos/comum";
 
-function grupos(pode, usuario) {
+function grupos(pode, usuario, alertasRecebimentos) {
   const lista = [
     {
       titulo: "Conta",
@@ -38,6 +39,7 @@ function grupos(pode, usuario) {
       titulo: "Gestão",
       itens: [
         pode("PRODUTOS") && { label: "Gerenciar Produtos", rota: "/produtos" },
+        pode("RECEBIMENTOS") && { label: "Recebimentos", rota: "/recebimentos", contador: alertasRecebimentos },
         pode("ENTRADAS") && { label: "Entradas", rota: "/entradas" },
         pode("ORCAMENTOS") && { label: "Orçamentos", rota: "/orcamentos" },
         pode("PRODUTOS", "COMERCIAL") && { label: "Banners do catálogo", rota: "/banners" },
@@ -139,6 +141,7 @@ export function Header() {
   const { quantidade } = useCart();
   const navigate = useNavigate();
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
+  const alertasRecebimentos = useAlertasRecebimentos(Boolean(usuario) && pode("RECEBIMENTOS"))?.total || 0;
 
   return (
     <header className="no-print sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
@@ -156,24 +159,26 @@ export function Header() {
                   <User className="h-4 w-4" />
                   <span className="hidden max-w-32 truncate sm:inline">{usuario.nome?.split(" ")[0]}</span>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  {alertasRecebimentos > 0 && <span className="h-2 w-2 rounded-full bg-red-500" aria-label="Há alertas em Recebimentos" />}
                 </button>
               }
             >
               {(fechar) => (
                 <nav className="w-60 py-1">
-                  {grupos(pode, usuario).map((g) => (
+                  {grupos(pode, usuario, alertasRecebimentos).map((g) => (
                     <div key={g.titulo} className="mb-1">
                       <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.titulo}</p>
                       {g.itens.map((i) => (
                         <button
                           key={i.rota}
-                          className="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-muted"
+                          className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-sm hover:bg-muted"
                           onClick={() => {
                             fechar();
                             navigate(i.rota);
                           }}
                         >
                           {i.label}
+                          {i.contador > 0 && <span className="rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">{i.contador}</span>}
                         </button>
                       ))}
                     </div>

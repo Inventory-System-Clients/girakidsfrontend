@@ -26,6 +26,8 @@ const Banners = lazy(() => import("./pages/Banners"));
 const CustosPosVenda = lazy(() => import("./pages/comercial/CustosPosVenda"));
 const Produtos = lazy(() => import("./pages/Produtos"));
 const Entradas = lazy(() => import("./pages/Entradas"));
+const Recebimentos = lazy(() => import("./pages/Recebimentos"));
+const FornecedorRecebimento = lazy(() => import("./pages/FornecedorRecebimento"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const BuscaTransportadoras = lazy(() => import("./pages/comercial/BuscaTransportadoras").then((m) => ({ default: m.BuscaTransportadoras })));
 const CalculadoraPedidos = lazy(() => import("./pages/comercial/CalculadoraPedidos").then((m) => ({ default: m.CalculadoraPedidos })));
@@ -43,6 +45,20 @@ function GiraldoNoSite() {
   return <Giraldo />;
 }
 
+// Cabeçalho, alertas, WhatsApp e Giraldo ficam fora do link do fornecedor.
+function Moldura() {
+  const { pathname } = useLocation();
+  if (pathname.startsWith("/fornecedor")) return null;
+  return (
+    <>
+      <Header />
+      <AlertasClientes />
+      <WhatsappFlutuante />
+      <GiraldoNoSite />
+    </>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -50,10 +66,7 @@ export default function App() {
         <CartProvider>
           <ToastProvider>
             <ConfirmProvider>
-              <Header />
-              <AlertasClientes />
-              <WhatsappFlutuante />
-              <GiraldoNoSite />
+              <Moldura />
               <Suspense
                 fallback={
                   <div className="flex min-h-[50vh] items-center justify-center">
@@ -79,6 +92,8 @@ export default function App() {
                   <Route path="/expedicao/:id" element={<Protegida permissoes={["EXPEDICAO"]}><MontagemPedido /></Protegida>} />
                   <Route path="/produtos" element={<Protegida permissoes={["PRODUTOS"]}><Produtos /></Protegida>} />
                   <Route path="/entradas" element={<Protegida permissoes={["ENTRADAS"]}><Entradas /></Protegida>} />
+                  <Route path="/recebimentos" element={<Protegida permissoes={["RECEBIMENTOS"]}><Recebimentos /></Protegida>} />
+                  <Route path="/fornecedor" element={<FornecedorRecebimento />} />
                   <Route path="/orcamentos" element={<Protegida permissoes={["ORCAMENTOS"]}><Checkout modo="orcamento" /></Protegida>} />
                   <Route path="/usuarios" element={<Protegida permissoes={["USUARIOS"]}><Usuarios /></Protegida>} />
                   <Route path="/comercial/transportadoras" element={<Protegida permissoes={["COMERCIAL"]}><BuscaTransportadoras /></Protegida>} />

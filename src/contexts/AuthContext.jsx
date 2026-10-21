@@ -14,6 +14,7 @@ export const TELAS = {
   ORCAMENTOS: { label: "Orçamentos", rota: "/orcamentos", descricao: "Permite gerar orçamentos usando o fluxo administrativo dedicado." },
   USUARIOS: { label: "Gerenciar Usuários", rota: "/usuarios", descricao: "Permite acessar a gestão de usuários dentro do escopo delegado." },
   COMERCIAL: { label: "Comercial", rota: "/comercial/correios", descricao: "Transportadoras, calculadora de pedidos, notas fiscais e Correios." },
+  RECEBIMENTOS: { label: "Recebimentos", rota: "/recebimentos", descricao: "Pré-recebimentos com link para o fornecedor, conferência, montagem em cápsula e compra de cápsulas." },
 };
 
 export function AuthProvider({ children }) {
