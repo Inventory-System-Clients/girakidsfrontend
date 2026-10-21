@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { Link2, Maximize2, Package, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
 import api from "../services/api";
 import Carrossel from "../components/Carrossel";
-import BannerCarrossel from "../components/BannerCarrossel";
+import BannerCarrossel, { useLayoutBanner } from "../components/BannerCarrossel";
 import { Visualizador } from "../components/pedido/Fotos";
 import { useCart } from "../contexts/CartContext";
 import { Badge, Button, Card, Dialog, Skeleton, cx, useToast } from "../components/ui";
@@ -85,6 +85,7 @@ export default function Catalogo() {
   const [pagina, setPagina] = useState(1);
   const [detalhe, setDetalhe] = useState(null);
   const [ampliada, setAmpliada] = useState(null);
+  const layoutBanner = useLayoutBanner();
   const { produtoId } = useParams();
   const toast = useToast();
 
@@ -147,17 +148,21 @@ export default function Catalogo() {
     };
   }, [categoria, buscaAplicada, pagina]);
 
+  const tituloCatalogo = (
+    <section className="border-b border-border bg-gradient-to-r from-sky-50 via-white to-rose-50 py-8 text-center">
+      <h1 className="flex items-center justify-center gap-2 text-2xl font-bold">
+        <ShoppingBag className="h-7 w-7 text-primary" /> Catálogo Digital
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground">Encontre facilmente o que procura</p>
+    </section>
+  );
+
   const paginas = dados?.paginas || 1;
   const numerosPagina = [...new Set([1, pagina - 1, pagina, pagina + 1, paginas])].filter((n) => n >= 1 && n <= paginas).sort((a, b) => a - b);
 
   return (
     <div className="toy-pattern-bg min-h-[calc(100dvh-4rem)]">
-      <section className="border-b border-border bg-gradient-to-r from-sky-50 via-white to-rose-50 py-8 text-center">
-        <h1 className="flex items-center justify-center gap-2 text-2xl font-bold">
-          <ShoppingBag className="h-7 w-7 text-primary" /> Catálogo Digital
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">Encontre facilmente o que procura</p>
-      </section>
+      {layoutBanner === "FAIXA" ? <BannerCarrossel variante="faixa" onAbrir={abrirBanner} vazio={tituloCatalogo} /> : layoutBanner && tituloCatalogo}
 
       <div className="container-app grid grid-cols-1 gap-6 py-8 lg:grid-cols-[17rem_1fr] 2xl:grid-cols-[19rem_1fr]">
         <aside>
@@ -191,7 +196,7 @@ export default function Catalogo() {
             <Search className="absolute top-3 left-3 h-4 w-4 text-muted-foreground" />
             <input className="input h-11 bg-white pl-10 shadow-sm" placeholder="Buscar por nome, categoria, descrição..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
-          {!categoria && !buscaAplicada && <BannerCarrossel onAbrir={abrirBanner} />}
+          {layoutBanner === "CLASSICO" && !categoria && !buscaAplicada && <BannerCarrossel onAbrir={abrirBanner} />}
           <Card className="mb-4 px-4 py-3 text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{dados?.total ?? "..."}</span> produtos encontrados
           </Card>

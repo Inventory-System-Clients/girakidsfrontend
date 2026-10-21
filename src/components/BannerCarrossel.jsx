@@ -1,38 +1,86 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import api from "../services/api";
 import { cx } from "./ui";
 
 const TROCA_MS = 10000;
+const TROCA_FAIXA_MS = 7000;
 
-// Destaques do topo do catálogo (mesmo funcionamento da Prime Plush): arte
-// pronta, troca automática a cada 10s, setas, bolinhas e botão que leva a uma
-// categoria, busca ou produto.
-export default function BannerCarrossel({ onAbrir }) {
-  const [banners, setBanners] = useState([]);
+// Onde os banners aparecem no catálogo (configurável em Banners):
+// FAIXA = largura toda no lugar do título; CLASSICO = cartão acima dos produtos.
+let layoutCache = null;
+const ouvintes = new Set();
+
+export const definirLayoutBanner = (layout) => {
+  layoutCache = layout;
+  ouvintes.forEach((f) => f(layout));
+};
+
+export function useLayoutBanner() {
+  const [layout, setLayout] = useState(layoutCache);
+  useEffect(() => {
+    ouvintes.add(setLayout);
+    if (!layoutCache) {
+      api
+        .get("/config/publica")
+        .then(({ data }) => definirLayoutBanner(data.bannerLayout || "FAIXA"))
+        .catch(() => definirLayoutBanner("CLASSICO"));
+    }
+    return () => ouvintes.delete(setLayout);
+  }, []);
+  return layout;
+}
+
+// Destaques do catálogo (mesmo funcionamento da Prime Plush): arte pronta,
+// troca automática, setas, bolinhas e botão que leva a uma categoria, busca
+// ou produto. Na variante "faixa" ocupa a largura toda e desliza suavemente;
+// sem banners mostra "vazio".
+export default function BannerCarrossel({ onAbrir, variante = "classico", vazio = null }) {
+  const faixa = variante === "faixa";
+  const [banners, setBanners] = useState(null);
   const [indice, setIndice] = useState(0);
   const [pausado, setPausado] = useState(false);
   const toqueX = useRef(null);
 
   useEffect(() => {
-    api.get("/banners").then(({ data }) => setBanners(Array.isArray(data) ? data : [])).catch(() => {});
+    api
+      .get("/banners")
+      .then(({ data }) => setBanners(Array.isArray(data) ? data : []))
+      .catch(() => setBanners([]));
   }, []);
 
+  const total = banners?.length || 0;
   useEffect(() => {
-    if (banners.length <= 1 || pausado) return undefined;
-    const t = setInterval(() => setIndice((i) => (i + 1) % banners.length), TROCA_MS);
+    if (total <= 1 || pausado) return undefined;
+    const t = setInterval(() => setIndice((i) => (i + 1) % total), faixa ? TROCA_FAIXA_MS : TROCA_MS);
     return () => clearInterval(t);
-  }, [banners.length, pausado]);
+  }, [total, pausado, faixa]);
 
-  if (!banners.length) return null;
-  const atual = banners[indice % banners.length];
-  const ir = (d) => setIndice((i) => (i + d + banners.length) % banners.length);
-  const temDestino = atual.categoria || atual.busca || atual.produtoId;
+  if (!banners) return null;
+  if (!total) return vazio;
+  const posicao = indice % total;
+  const atual = banners[posicao];
+  const ir = (d) => setIndice((i) => (i + d + total) % total);
+  const destinoDe = (b) => b.categoria || b.busca || b.produtoId;
+
+  const imagem = (b, eager) => (
+    <picture>
+      {b.imagemMobileUrl && <source media="(max-width: 640px)" srcSet={b.imagemMobileUrl} />}
+      <img
+        src={b.imagemUrl}
+        alt={b.alt || ""}
+        className={cx("aspect-[16/9] w-full object-cover sm:aspect-[3/1]", faixa && "sm:max-h-[70vh]")}
+        loading={eager ? "eager" : "lazy"}
+        draggable={false}
+      />
+    </picture>
+  );
 
   return (
     <section
       aria-label="Destaques"
-      className="relative mb-5 overflow-hidden rounded-2xl bg-slate-100 shadow-sm"
+      className={cx("relative overflow-hidden bg-slate-100", faixa ? "border-b border-border" : "mb-5 rounded-2xl shadow-sm")}
       onMouseEnter={() => setPausado(true)}
       onMouseLeave={() => setPausado(false)}
       onTouchStart={(e) => (toqueX.current = e.touches[0].clientX)}
@@ -41,37 +89,55 @@ export default function BannerCarrossel({ onAbrir }) {
         if (Math.abs(dx) > 40) ir(dx < 0 ? 1 : -1);
       }}
     >
-      <button type="button" className={cx("block w-full", !temDestino && "cursor-default")} onClick={() => temDestino && onAbrir(atual)} aria-label={atual.alt || "Destaque"}>
-        <picture>
-          {atual.imagemMobileUrl && <source media="(max-width: 640px)" srcSet={atual.imagemMobileUrl} />}
-          <img src={atual.imagemUrl} alt={atual.alt || ""} className="aspect-[16/9] w-full object-cover sm:aspect-[3/1]" loading="eager" />
-        </picture>
-      </button>
-      {temDestino && (
+      {faixa ? (
+        <div className="flex transition-transform duration-1000 ease-in-out" style={{ transform: `translateX(-${posicao * 100}%)` }}>
+          {banners.map((b, i) => (
+            <button
+              key={b.id}
+              type="button"
+              className={cx("block w-full shrink-0", !destinoDe(b) && "cursor-default")}
+              onClick={() => destinoDe(b) && onAbrir(b)}
+              aria-label={b.alt || "Destaque"}
+              aria-hidden={i !== posicao}
+              tabIndex={i === posicao ? 0 : -1}
+            >
+              {imagem(b, i === 0)}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button type="button" className={cx("block w-full", !destinoDe(atual) && "cursor-default")} onClick={() => destinoDe(atual) && onAbrir(atual)} aria-label={atual.alt || "Destaque"}>
+          {imagem(atual, true)}
+        </button>
+      )}
+      {destinoDe(atual) && (
         <button
           type="button"
           onClick={() => onAbrir(atual)}
-          className="absolute bottom-4 left-4 inline-flex items-center gap-1 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-primary shadow-md transition hover:scale-[1.03] sm:bottom-6 sm:left-6"
+          className={cx(
+            "absolute bottom-4 inline-flex items-center gap-1 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-primary shadow-md transition hover:scale-[1.03] sm:bottom-6",
+            faixa ? "left-4 sm:left-8 lg:left-12" : "left-4 sm:left-6",
+          )}
         >
           {atual.textoBotao || "Ver coleção"} <span aria-hidden="true">›</span>
         </button>
       )}
-      {banners.length > 1 && (
+      {total > 1 && (
         <>
-          <button type="button" onClick={() => ir(-1)} className="absolute top-1/2 left-2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white" aria-label="Destaque anterior">
+          <button type="button" onClick={() => ir(-1)} className={cx("absolute top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white", faixa ? "left-3 sm:left-5" : "left-2")} aria-label="Destaque anterior">
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <button type="button" onClick={() => ir(1)} className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white" aria-label="Próximo destaque">
+          <button type="button" onClick={() => ir(1)} className={cx("absolute top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white", faixa ? "right-3 sm:right-5" : "right-2")} aria-label="Próximo destaque">
             <ChevronRight className="h-5 w-5" />
           </button>
-          <div className="absolute right-4 bottom-4 flex gap-1.5 sm:bottom-6">
+          <div className={cx("absolute bottom-4 flex gap-1.5 sm:bottom-6", faixa ? "right-4 sm:right-8 lg:right-12" : "right-4")}>
             {banners.map((b, i) => (
               <button
                 key={b.id}
                 type="button"
                 onClick={() => setIndice(i)}
                 aria-label={`Ver destaque ${i + 1}`}
-                className={cx("h-2 rounded-full transition-all", i === indice % banners.length ? "w-6 bg-white" : "w-2 bg-white/60")}
+                className={cx("h-2 rounded-full transition-all", i === posicao ? "w-6 bg-white" : "w-2 bg-white/60")}
               />
             ))}
           </div>

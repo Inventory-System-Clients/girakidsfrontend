@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, ImagePlus, Pencil, Plus, Trash2, Upload } from "luc
 import api, { enviarArquivo, mensagemErro } from "../services/api";
 import { Badge, Button, Card, Dialog, EmptyState, Field, Input, PageHeader, Select, Skeleton, Switch, useConfirm, useToast } from "../components/ui";
 import { comprimirImagem } from "../utils/format";
+import { definirLayoutBanner, useLayoutBanner } from "../components/BannerCarrossel";
 
 function UploadArte({ label, dica, valor, onChange }) {
   const toast = useToast();
@@ -163,6 +164,19 @@ export default function Banners() {
   const [banners, setBanners] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [form, setForm] = useState(undefined);
+  const layout = useLayoutBanner();
+
+  const trocarLayout = async (faixa) => {
+    const anterior = layout;
+    definirLayoutBanner(faixa ? "FAIXA" : "CLASSICO");
+    try {
+      await api.put("/config/banner-layout", { bannerLayout: faixa ? "FAIXA" : "CLASSICO" });
+      toast({ titulo: faixa ? "Banner em faixa no topo do catálogo" : "Banner voltou para o formato anterior" });
+    } catch (error) {
+      definirLayoutBanner(anterior);
+      toast({ titulo: "Erro ao trocar o formato", descricao: mensagemErro(error), tipo: "erro" });
+    }
+  };
 
   const carregar = () => api.get("/banners/todos").then(({ data }) => setBanners(data));
   useEffect(() => {
@@ -200,11 +214,20 @@ export default function Banners() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <PageHeader titulo="Banners do catálogo" subtitulo="Destaques no topo do catálogo: trocam sozinhos a cada 10 segundos, com botão para uma categoria, busca ou produto.">
+      <PageHeader titulo="Banners do catálogo" subtitulo="Destaques no topo do catálogo: trocam sozinhos, com botão para uma categoria, busca ou produto.">
         <Button onClick={() => setForm(null)}>
           <Plus className="h-4 w-4" /> Novo banner
         </Button>
       </PageHeader>
+      <Card className="mb-4 flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-semibold">Banner em faixa no topo</p>
+          <p className="text-sm text-muted-foreground">
+            Ligado: o banner ocupa a largura toda no lugar de “Catálogo Digital” e desliza sozinho. Desligado: volta ao cartão acima dos produtos.
+          </p>
+        </div>
+        <Switch checked={layout === "FAIXA"} disabled={!layout} onChange={trocarLayout} />
+      </Card>
       {!banners && <Skeleton className="h-48" />}
       {banners?.length === 0 && (
         <Card>
