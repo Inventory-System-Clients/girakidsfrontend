@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { Package, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { Link2, Maximize2, Package, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
 import api from "../services/api";
 import Carrossel from "../components/Carrossel";
+import BannerCarrossel from "../components/BannerCarrossel";
+import { Visualizador } from "../components/pedido/Fotos";
 import { useCart } from "../contexts/CartContext";
-import { Badge, Card, Dialog, Skeleton, cx } from "../components/ui";
+import { Badge, Button, Card, Dialog, Skeleton, cx, useToast } from "../components/ui";
 import { moeda, moedaUnitaria } from "../utils/format";
 
 const POR_PAGINA = 12;
@@ -77,6 +80,49 @@ export default function Catalogo() {
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [pagina, setPagina] = useState(1);
   const [detalhe, setDetalhe] = useState(null);
+  const [ampliada, setAmpliada] = useState(null);
+  const { produtoId } = useParams();
+  const toast = useToast();
+
+  // Link do produto (/produto/:id) abre o catálogo já com o item ampliado.
+  useEffect(() => {
+    if (!produtoId) return;
+    api
+      .get(`/catalogo/produtos/${produtoId}`)
+      .then(({ data }) => setDetalhe(data))
+      .catch(() => toast({ titulo: "Produto não encontrado", descricao: "Ele pode ter sido removido do catálogo.", tipo: "aviso" }));
+  }, [produtoId, toast]);
+
+  const abrirDetalhe = (p) => {
+    setDetalhe(p);
+    window.history.replaceState(window.history.state, "", `/produto/${p.id}`);
+  };
+  const fecharDetalhe = () => {
+    setDetalhe(null);
+    setAmpliada(null);
+    if (window.location.pathname.startsWith("/produto/")) window.history.replaceState(window.history.state, "", "/");
+  };
+  const linkProduto = (p) => `${window.location.origin}/produto/${p.id}`;
+  const copiarLink = async (p) => {
+    try {
+      await navigator.clipboard.writeText(linkProduto(p));
+      toast({ titulo: "Link copiado", descricao: "Quem abrir o link verá este produto ampliado." });
+    } catch {
+      window.prompt("Copie o link do produto:", linkProduto(p));
+    }
+  };
+  const abrirBanner = (b) => {
+    if (b.produtoId) {
+      api.get(`/catalogo/produtos/${b.produtoId}`).then(({ data }) => abrirDetalhe(data)).catch(() => {});
+    } else if (b.categoria) {
+      setCategoria(b.categoria);
+      setBusca("");
+      setPagina(1);
+    } else if (b.busca) {
+      setBusca(b.busca);
+      setCategoria("");
+    }
+  };
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -141,6 +187,7 @@ export default function Catalogo() {
             <Search className="absolute top-3 left-3 h-4 w-4 text-muted-foreground" />
             <input className="input h-11 bg-white pl-10 shadow-sm" placeholder="Buscar por nome, categoria, descrição..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
+          {!categoria && !buscaAplicada && <BannerCarrossel onAbrir={abrirBanner} />}
           <Card className="mb-4 px-4 py-3 text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{dados?.total ?? "..."}</span> produtos encontrados
           </Card>
@@ -148,7 +195,7 @@ export default function Catalogo() {
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {!dados && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="aspect-[3/5]" />)}
             {dados?.produtos.map((p) => (
-              <CardProduto key={p.id} produto={p} onAbrir={() => setDetalhe(p)} />
+              <CardProduto key={p.id} produto={p} onAbrir={() => abrirDetalhe(p)} />
             ))}
           </div>
           {dados && !dados.produtos.length && <p className="py-16 text-center text-muted-foreground">Nenhum produto encontrado.</p>}
@@ -174,10 +221,20 @@ export default function Catalogo() {
         </main>
       </div>
 
-      <Dialog aberto={Boolean(detalhe)} onFechar={() => setDetalhe(null)} titulo={detalhe?.nome} descricao={detalhe?.categoria} tamanho="md">
+      <Dialog aberto={Boolean(detalhe)} onFechar={fecharDetalhe} titulo={detalhe?.nome} descricao={detalhe?.categoria} tamanho="lg">
         {detalhe && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Carrossel imagens={imagensDoProduto(detalhe)} alt={detalhe.nome} className="aspect-square rounded-lg" />
+            <div>
+              <Carrossel imagens={imagensDoProduto(detalhe)} alt={detalhe.nome} className="aspect-square rounded-lg" onAmpliar={setAmpliada} />
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAmpliada(0)} disabled={!imagensDoProduto(detalhe).length}>
+                  <Maximize2 className="h-4 w-4" /> Ampliar
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => copiarLink(detalhe)}>
+                  <Link2 className="h-4 w-4" /> Copiar link do produto
+                </Button>
+              </div>
+            </div>
             <div className="flex flex-col gap-2">
               <p className="text-sm text-muted-foreground">SKU {detalhe.sku}</p>
               {detalhe.descricao && <p className="text-sm">{detalhe.descricao}</p>}
@@ -196,6 +253,7 @@ export default function Catalogo() {
           </div>
         )}
       </Dialog>
+      {detalhe && ampliada != null && <Visualizador fotos={imagensDoProduto(detalhe)} inicial={ampliada} onFechar={() => setAmpliada(null)} />}
     </div>
   );
 }

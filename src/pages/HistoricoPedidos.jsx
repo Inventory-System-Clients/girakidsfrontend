@@ -21,6 +21,7 @@ import {
   useToast,
 } from "../components/ui";
 import AcoesPedido from "../components/pedido/AcoesPedido";
+import { EtiquetasChips } from "../components/Etiquetas";
 import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaFinanceiro, CelulaMetodo, CelulaNumero, CelulaVendas } from "../components/pedido/StatusCelulas";
 import { dataHora, exportarCsv, inicioMesISO, hojeISO, moeda } from "../utils/format";
 import { EXPEDICAO, FINANCEIRO, FORMAS_PAGAMENTO, METODOS_ENVIO, VENDAS, corLinhaPedido, nomeForma } from "../utils/status";
@@ -271,7 +272,10 @@ export default function HistoricoPedidos() {
               <Td>
                 <CelulaNumero pedido={p} />
               </Td>
-              <Td className="max-w-40">{p.clienteNome}</Td>
+              <Td className="max-w-44">
+                {p.clienteNome}
+                {p.cliente?.etiquetas?.length > 0 && <EtiquetasChips etiquetas={p.cliente.etiquetas} className="mt-0.5 justify-center" />}
+              </Td>
               <Td>
                 <CelulaData pedido={p} />
               </Td>

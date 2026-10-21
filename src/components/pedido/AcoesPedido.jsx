@@ -22,6 +22,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { Badge, Button, Checkbox, Dialog, Field, Input, RowMenu, Select, Textarea, useConfirm, useToast } from "../ui";
 import PedidoDetalhes from "./PedidoDetalhes";
 import { FotosUpload } from "./Fotos";
+import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
 import { EditorMescla } from "../../pages/Checkout";
 import { data, hojeISO, lerNumero, moeda } from "../../utils/format";
 import { FORMAS_PAGAMENTO, nomeForma } from "../../utils/status";
@@ -779,6 +780,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
             contexto === "vendas" && ativo && financeiro && { label: "Alterar forma de pagamento", icone: CreditCard, onClick: () => comCompleto("forma") },
             contexto === "vendas" && ativo && { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
             contexto === "vendas" && ativo && { label: "Nota fiscal", icone: FileText, onClick: () => comCompleto("nota") },
+            contexto === "vendas" && ativo && pode("COMERCIAL", "FINANCEIRO", "VENDAS") && { label: "Custo pós-venda", icone: HandCoins, onClick: () => setDialogo({ nome: "custo", pedido }) },
             contexto === "vendas" && ativo && !expedido && pode("VENDAS") && { label: "Cancelar Pedido", icone: Ban, perigo: true, onClick: cancelar },
           ];
 
@@ -796,6 +798,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
       {dialogo?.nome === "nota" && <NotaFiscalDialog {...props} />}
       {dialogo?.nome === "expedir" && <ExpedirDialog {...props} />}
       {dialogo?.nome === "editar" && <EditarPedidoDialog {...props} />}
+      {dialogo?.nome === "custo" && <NovoCustoDialog pedido={dialogo.pedido} onFechar={() => setDialogo(null)} onSalvo={() => setDialogo(null)} />}
     </>
   );
 }

@@ -6,6 +6,8 @@ import { carimbo, data, dataHora, mascaraDocumento, moeda, moedaUnitaria, pesoKg
 import { EXPEDICAO, FINANCEIRO, METODOS_ENVIO, VENDAS, nomeForma } from "../../utils/status";
 import { gerarPdfPedido } from "../../utils/pdf";
 import { GaleriaFotos } from "./Fotos";
+import { EditorEtiquetas, EtiquetasChips } from "../Etiquetas";
+import { BotaoWhatsapp } from "../Whatsapp";
 
 const Info = ({ rotulo, children }) => (
   <div className="flex gap-2 text-sm">
@@ -73,8 +75,25 @@ export default function PedidoDetalhes({ pedidoId, onFechar }) {
           <div className="grid gap-4 md:grid-cols-2">
             <Bloco titulo="Informações do Cliente">
               <Info rotulo="Nome">{pedido.clienteNome}</Info>
+              {pedido.cliente && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <EtiquetasChips etiquetas={pedido.cliente.etiquetas} />
+                  <EditorEtiquetas
+                    clienteId={pedido.cliente.id}
+                    etiquetas={pedido.cliente.etiquetas}
+                    observacao={pedido.cliente.observacaoComercial}
+                    onSalvo={(d) => setPedido((p) => ({ ...p, cliente: { ...p.cliente, ...d } }))}
+                  />
+                </div>
+              )}
+              {pedido.cliente?.observacaoComercial && <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-900">Obs. comercial: {pedido.cliente.observacaoComercial}</p>}
               <Info rotulo="Email">{pedido.clienteEmail}</Info>
               <Info rotulo="Telefone">{pedido.clienteTelefone}</Info>
+              {pedido.clienteTelefone && pedido.cliente !== undefined && (
+                <BotaoWhatsapp telefone={pedido.clienteTelefone} variante="contorno" className="py-1 text-xs" texto={`Olá ${pedido.clienteNome.split(" ")[0]}! Aqui é da Gira Kids, sobre o pedido ${pedido.numeroFormatado}.`}>
+                  WhatsApp do cliente
+                </BotaoWhatsapp>
+              )}
               <Info rotulo="CPF/CNPJ">{pedido.documento ? `${pedido.documentoTipo || ""}: ${mascaraDocumento(pedido.documento)}` : "-"}</Info>
               <Info rotulo="Tipo">{pedido.origemCliente === "ADMIN" ? "Administrador" : "Cliente"}</Info>
               <Info rotulo="Criado por">{pedido.criadoPorNome}</Info>
@@ -190,6 +209,16 @@ export default function PedidoDetalhes({ pedidoId, onFechar }) {
                 <GaleriaFotos titulo="Fotos da transportadora" fotos={pedido.imagensTransportadora} />
               </div>
               {!pedido.imagensExpedicao?.length && !pedido.imagensTransportadora?.length && <p className="text-xs text-muted-foreground">Nenhuma foto anexada.</p>}
+            </Bloco>
+          )}
+
+          {pedido.custosExtras?.length > 0 && (
+            <Bloco titulo={`Custos pós-venda · ${moeda(pedido.custoExtraTotal)}`}>
+              {pedido.custosExtras.map((c) => (
+                <p key={c.id} className="text-sm">
+                  {data(c.data)} · <strong>{moeda(c.valor)}</strong> · {c.descricao} <span className="text-xs text-muted-foreground">({c.usuarioNome})</span>
+                </p>
+              ))}
             </Bloco>
           )}
 

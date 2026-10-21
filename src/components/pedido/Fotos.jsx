@@ -6,7 +6,7 @@ import { comprimirImagem } from "../../utils/format";
 import { cx, useToast } from "../ui";
 
 // Visualizador em tela cheia (setas, Esc, arrastar no celular).
-function Visualizador({ fotos, inicial, onFechar }) {
+export function Visualizador({ fotos, inicial, onFechar }) {
   const [i, setI] = useState(inicial);
   const toqueX = useRef(null);
   const ir = (d) => setI((x) => (x + d + fotos.length) % fotos.length);

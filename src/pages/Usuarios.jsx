@@ -23,6 +23,7 @@ import {
   useToast,
 } from "../components/ui";
 import EnderecoCampos from "../components/EnderecoCampos";
+import { EditorEtiquetas, EtiquetasChips } from "../components/Etiquetas";
 import { data, lerNumero, moeda } from "../utils/format";
 import { ROLES } from "../utils/status";
 
@@ -244,6 +245,19 @@ export default function Usuarios() {
               <Td className="text-left font-medium">
                 {u.nome}
                 {u.trocarSenha && <Badge variant="warning" className="ml-1">Trocar senha</Badge>}
+                {u.role === "CLIENTE" && (
+                  <span className="mt-1 flex flex-wrap items-center gap-1">
+                    <EtiquetasChips etiquetas={u.etiquetas} />
+                    <EditorEtiquetas
+                      compacto
+                      clienteId={u.id}
+                      etiquetas={u.etiquetas || []}
+                      observacao={u.observacaoComercial}
+                      onSalvo={(d) => setDados((x) => ({ ...x, itens: x.itens.map((y) => (y.id === u.id ? { ...y, ...d } : y)) }))}
+                    />
+                  </span>
+                )}
+                {u.observacaoComercial && <span className="block text-[11px] font-normal text-amber-800">{u.observacaoComercial}</span>}
               </Td>
               <Td className="text-left">{u.email}</Td>
               <Td>

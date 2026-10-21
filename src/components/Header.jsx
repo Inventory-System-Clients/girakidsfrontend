@@ -40,6 +40,7 @@ function grupos(pode, usuario) {
         pode("PRODUTOS") && { label: "Gerenciar Produtos", rota: "/produtos" },
         pode("ENTRADAS") && { label: "Entradas", rota: "/entradas" },
         pode("ORCAMENTOS") && { label: "Orçamentos", rota: "/orcamentos" },
+        pode("PRODUTOS", "COMERCIAL") && { label: "Banners do catálogo", rota: "/banners" },
       ],
     },
     {
@@ -50,8 +51,11 @@ function grupos(pode, usuario) {
             { label: "📦 Calculadora de Pedidos", rota: "/comercial/calculadora-pedidos" },
             { label: "📑 Pedidos e Notas Fiscais", rota: "/comercial/pedidos-notas-fiscais" },
             { label: "📮 Correios", rota: "/comercial/correios" },
+            { label: "💸 Custos pós-venda", rota: "/comercial/custos-pos-venda" },
           ]
-        : [],
+        : pode("FINANCEIRO", "VENDAS")
+          ? [{ label: "💸 Custos pós-venda", rota: "/comercial/custos-pos-venda" }]
+          : [],
     },
     {
       titulo: "Administração",

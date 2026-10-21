@@ -53,7 +53,7 @@ function Resumo({ periodo }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">Receita líquida desconta taxas, frete e custo dos itens; sem custo cadastrado, considera R$ 0,00.</p>
+        <p className="text-xs text-muted-foreground">Receita líquida desconta taxas, frete, custo dos itens e custos pós-venda; sem custo cadastrado, considera R$ 0,00.</p>
         <Segmented value={modo} onChange={setModo} opcoes={[{ value: "bruta", label: "Receita bruta" }, { value: "liquida", label: "Receita líquida" }]} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -68,12 +68,13 @@ function Resumo({ periodo }) {
         </button>
       </div>
       {expandido && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <MetricCard titulo="Ticket médio" valor={moeda(d.extras.ticketMedio)} />
           <MetricCard titulo="Custo dos itens" valor={moeda(d.extras.custoItens)} />
           <MetricCard titulo="Taxas de pagamento" valor={moeda(d.extras.taxas)} />
           <MetricCard titulo="Frete cobrado" valor={moeda(d.extras.frete)} />
           <MetricCard titulo="Descontos concedidos" valor={moeda(d.extras.desconto)} />
+          <MetricCard titulo="Custos pós-venda" valor={moeda(d.extras.custosPosVenda)} detalhe="Reenvios, avarias, trocas" />
         </div>
       )}
 

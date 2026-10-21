@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Copy, Download, FileDown, Package, Plus, ShoppingCart, Trash2, Truck, UserSearch, Wallet } from "lucide-react";
+import { Copy, Download, FileDown, Package, Plus, ShoppingCart, Sparkles, Trash2, Truck, Wallet } from "lucide-react";
 import api, { mensagemErro } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
@@ -22,6 +22,8 @@ import {
   useToast,
 } from "../components/ui";
 import EnderecoCampos from "../components/EnderecoCampos";
+import ClienteBusca from "../components/ClienteBusca";
+import { ClienteSelecionado, HistoricoCliente, MontarComIA } from "../components/checkout/Assistente";
 import { hojeISO, lerNumero, moeda, moedaUnitaria, somenteDigitos } from "../utils/format";
 import { FORMAS_PAGAMENTO } from "../utils/status";
 import { gerarPdfPedido } from "../utils/pdf";
@@ -111,47 +113,6 @@ function CarregarPedido({ onCarregado }) {
   );
 }
 
-function BuscarCliente({ onEscolher }) {
-  const [busca, setBusca] = useState("");
-  const [lista, setLista] = useState([]);
-  useEffect(() => {
-    if (busca.trim().length < 2) return setLista([]);
-    const t = setTimeout(() => api.get("/usuarios/clientes", { params: { busca } }).then(({ data }) => setLista(data)).catch(() => {}), 300);
-    return () => clearTimeout(t);
-  }, [busca]);
-  return (
-    <Popover
-      gatilho={
-        <Button variant="outline" size="sm">
-          <UserSearch className="h-4 w-4" /> Preencher com dados de outro usuário
-        </Button>
-      }
-    >
-      {(fechar) => (
-        <div className="w-80 p-1">
-          <Input placeholder="Buscar por nome ou email..." value={busca} onChange={(e) => setBusca(e.target.value)} autoFocus />
-          <div className="mt-1 max-h-72 overflow-y-auto">
-            {busca.length < 2 && <p className="p-3 text-center text-sm text-muted-foreground">Digite o nome ou email do cliente para buscar.</p>}
-            {lista.map((u) => (
-              <button
-                key={u.id}
-                className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
-                onClick={() => {
-                  onEscolher(u);
-                  fechar();
-                }}
-              >
-                <span className="font-medium">{u.nome}</span>
-                <span className="block text-xs text-muted-foreground">{u.email}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </Popover>
-  );
-}
-
 // Mescla de pagamentos: divide o total entre formas com vencimentos próprios.
 export function EditorMescla({ linhas, onChange, total, formas }) {
   const soma = linhas.reduce((s, l) => s + lerNumero(l.valor), 0);
@@ -192,8 +153,32 @@ export default function Checkout({ modo = "pedido" }) {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [cliente, setCliente] = useState(() => (interno ? dadosDoUsuario({}) : dadosDoUsuario(usuario)));
-  const [clienteId, setClienteId] = useState(null);
+  // Equipe: cliente escolhido fica guardado na aba enquanto monta o carrinho
+  // pelo catálogo (sessionStorage).
+  const chaveCliente = `girakids_checkout_cliente_${modo}`;
+  const [clienteSelecionado, setClienteSelecionado] = useState(() => {
+    if (!interno) return null;
+    try {
+      return JSON.parse(sessionStorage.getItem(chaveCliente) || "null");
+    } catch {
+      return null;
+    }
+  });
+  const [cliente, setCliente] = useState(() => (interno ? dadosDoUsuario(clienteSelecionado || {}) : dadosDoUsuario(usuario)));
+  const [clienteId, setClienteId] = useState(() => clienteSelecionado?.id || null);
+  const [mostrarIA, setMostrarIA] = useState(false);
+
+  const escolherCliente = (u) => {
+    setClienteSelecionado(u);
+    setClienteId(u?.id || null);
+    setCliente(dadosDoUsuario(u || {}));
+    try {
+      if (u) sessionStorage.setItem(chaveCliente, JSON.stringify(u));
+      else sessionStorage.removeItem(chaveCliente);
+    } catch {
+      // sem armazenamento: vale só nesta tela
+    }
+  };
   const [observacoes, setObservacoes] = useState("");
   const [desconto, setDesconto] = useState("");
   const [freteAdicional, setFreteAdicional] = useState("");
@@ -271,9 +256,11 @@ export default function Checkout({ modo = "pedido" }) {
         setOrcamentoGerado(data);
         await gerarPdfPedido(data).catch(() => toast({ titulo: "Orçamento salvo sem PDF", tipo: "aviso" }));
         limpar();
+        escolherCliente(null);
       } else {
         const { data } = await api.post("/pedidos", corpo);
         limpar();
+        if (interno) escolherCliente(null);
         if (usarCredito) api.get("/auth/perfil").then(({ data: u }) => atualizarUsuario(u)).catch(() => {});
         navigate(`/pagamento/${data.id}`);
       }
@@ -304,6 +291,43 @@ export default function Checkout({ modo = "pedido" }) {
               Ver no histórico
             </Button>
             <Button onClick={() => setOrcamentoGerado(null)}>Novo orçamento</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Equipe com carrinho vazio: começa pelo cliente (copiar último pedido,
+  // itens frequentes ou IA a partir da mensagem dele).
+  if (!itens.length && interno) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <PageHeader titulo={orcamento ? "Geração de Orçamentos" : "Checkout"} subtitulo="Comece pelo cliente: copie o último pedido dele, adicione o que ele costuma comprar ou cole a mensagem para a IA montar.">
+          <CarregarPedido />
+        </PageHeader>
+        <Card className="space-y-5 p-5">
+          <div>
+            <p className="mb-2 text-sm font-semibold">1. Cliente</p>
+            {clienteSelecionado ? (
+              <ClienteSelecionado cliente={clienteSelecionado} onTrocar={() => escolherCliente(null)} onAtualizar={escolherCliente} />
+            ) : (
+              <ClienteBusca autoFocus onEscolher={escolherCliente} />
+            )}
+          </div>
+          {clienteSelecionado && (
+            <div>
+              <p className="mb-2 text-sm font-semibold">2. Itens</p>
+              <HistoricoCliente clienteId={clienteSelecionado.id} />
+            </div>
+          )}
+          <MontarComIA />
+          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+            <Link to="/">
+              <Button variant="outline">
+                <ShoppingCart className="h-4 w-4" /> Escolher no catálogo
+              </Button>
+            </Link>
+            {!clienteSelecionado && <span className="self-center text-xs text-muted-foreground">Também dá para montar sem cliente e preencher os dados depois.</span>}
           </div>
         </Card>
       </div>
@@ -344,8 +368,20 @@ export default function Checkout({ modo = "pedido" }) {
               <h2 className="flex items-center gap-2 text-lg font-semibold">
                 <Package className="h-5 w-5 text-primary" /> Revisar Pedido <Badge>{itens.length} produtos</Badge>
               </h2>
-              <CarregarPedido onCarregado={(p) => p.observacoes && setObservacoes(p.observacoes)} />
+              <div className="flex flex-wrap gap-2">
+                {interno && (
+                  <Button variant="outline" size="sm" onClick={() => setMostrarIA(!mostrarIA)}>
+                    <Sparkles className="h-4 w-4" /> Adicionar com IA
+                  </Button>
+                )}
+                <CarregarPedido onCarregado={(p) => p.observacoes && setObservacoes(p.observacoes)} />
+              </div>
             </div>
+            {interno && mostrarIA && (
+              <div className="mb-4">
+                <MontarComIA onAdicionado={() => setMostrarIA(false)} />
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-xs uppercase text-muted-foreground">
@@ -411,16 +447,17 @@ export default function Checkout({ modo = "pedido" }) {
                 <Button variant="outline" size="sm" onClick={() => setCliente(dadosDoUsuario(usuario))}>
                   Preencher automaticamente
                 </Button>
-                {interno && (
-                  <BuscarCliente
-                    onEscolher={(u) => {
-                      setClienteId(u.id);
-                      setCliente(dadosDoUsuario(u));
-                    }}
-                  />
-                )}
               </div>
             </div>
+            {interno && (
+              <div className="mb-4">
+                {clienteSelecionado ? (
+                  <ClienteSelecionado cliente={clienteSelecionado} onTrocar={() => escolherCliente(null)} onAtualizar={escolherCliente} />
+                ) : (
+                  <ClienteBusca onEscolher={escolherCliente} placeholder="Buscar cliente cadastrado (nome, e-mail, telefone ou CPF/CNPJ)..." />
+                )}
+              </div>
+            )}
             <EnderecoCampos valor={cliente} onChange={setCliente} obrigatorio={!orcamento} />
             <Field label="Observações do pedido" className="mt-4">
               <Textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />

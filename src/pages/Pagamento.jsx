@@ -7,6 +7,7 @@ import { Button, Card, Spinner, useToast } from "../components/ui";
 import { moeda } from "../utils/format";
 import { FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
 import { gerarPdfPedido } from "../utils/pdf";
+import { BotaoWhatsapp, useWhatsappComercial } from "../components/Whatsapp";
 
 // Tela pós-checkout: mostra o pedido salvo e, se o pagamento for online,
 // o QR Code/link do banco configurado e atualiza o status sozinha.
@@ -17,6 +18,7 @@ export default function Pagamento() {
   const [pedido, setPedido] = useState(null);
   const [erro, setErro] = useState("");
   const [atualizando, setAtualizando] = useState(false);
+  const whatsappComercial = useWhatsappComercial();
   const online = pedido && ["PIX_ONLINE", "CREDITO_ONLINE", "DEBITO_ONLINE"].includes(pedido.formaPagamento);
 
   const consultar = useCallback(async () => {
@@ -77,6 +79,15 @@ export default function Pagamento() {
                 : ""}
         </p>
         <div className="mt-6 flex flex-col gap-2">
+          {!interno && (
+            <BotaoWhatsapp
+              telefone={whatsappComercial}
+              className="py-3"
+              texto={`Olá! Acabei de fazer o pedido nº ${pedido.numeroFormatado} (${moeda(pedido.total)}) no site da Gira Kids e gostaria de falar com o comercial.`}
+            >
+              Falar com o comercial no WhatsApp
+            </BotaoWhatsapp>
+          )}
           {!pago && online && pedido.pagamentoReferencia && (
             <Button variant="outline" loading={atualizando} onClick={consultar}>
               <RefreshCw className="h-4 w-4" /> Atualizar status

@@ -4,7 +4,7 @@ import { cx } from "./ui";
 
 // Carrossel de imagens do produto. "compacto" = card do catálogo (setas no
 // hover e bolinhas); completo = diálogo do produto (setas + miniaturas).
-export default function Carrossel({ imagens, alt, compacto = false, className }) {
+export default function Carrossel({ imagens, alt, compacto = false, className, onAmpliar }) {
   const lista = imagens?.filter(Boolean) || [];
   const [indice, setIndice] = useState(0);
   const toqueX = useRef(null);
@@ -36,7 +36,13 @@ export default function Carrossel({ imagens, alt, compacto = false, className })
           toqueX.current = null;
         }}
       >
-        <img src={lista[atual]} alt={alt} loading="lazy" className="h-full w-full object-cover" />
+        <img
+          src={lista[atual]}
+          alt={alt}
+          loading="lazy"
+          className={cx("h-full w-full object-cover", onAmpliar && "cursor-zoom-in")}
+          onClick={onAmpliar ? (e) => (e.stopPropagation(), onAmpliar(atual)) : undefined}
+        />
         {lista.length > 1 && (
           <>
             <button

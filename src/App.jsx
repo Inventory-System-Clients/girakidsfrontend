@@ -8,6 +8,8 @@ import PrivateRoute from "./components/PrivateRoute";
 import Catalogo from "./pages/Catalogo";
 import Login from "./pages/Login";
 import Registrar from "./pages/Registrar";
+import AlertasClientes from "./components/AlertasClientes";
+import { WhatsappFlutuante } from "./components/Whatsapp";
 
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Pagamento = lazy(() => import("./pages/Pagamento"));
@@ -17,6 +19,8 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const HistoricoPedidos = lazy(() => import("./pages/HistoricoPedidos"));
 const Expedicao = lazy(() => import("./pages/Expedicao"));
 const MontagemPedido = lazy(() => import("./pages/MontagemPedido"));
+const Banners = lazy(() => import("./pages/Banners"));
+const CustosPosVenda = lazy(() => import("./pages/comercial/CustosPosVenda"));
 const Produtos = lazy(() => import("./pages/Produtos"));
 const Entradas = lazy(() => import("./pages/Entradas"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
@@ -35,6 +39,8 @@ export default function App() {
           <ToastProvider>
             <ConfirmProvider>
               <Header />
+              <AlertasClientes />
+              <WhatsappFlutuante />
               <Suspense
                 fallback={
                   <div className="flex min-h-[50vh] items-center justify-center">
@@ -45,6 +51,9 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Catalogo />} />
                   <Route path="/catalogo" element={<Catalogo />} />
+                  <Route path="/produto/:produtoId" element={<Catalogo />} />
+                  <Route path="/banners" element={<Protegida permissoes={["PRODUTOS", "COMERCIAL"]}><Banners /></Protegida>} />
+                  <Route path="/comercial/custos-pos-venda" element={<Protegida permissoes={["COMERCIAL", "FINANCEIRO", "VENDAS"]}><CustosPosVenda /></Protegida>} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/registrar" element={<Registrar />} />
                   <Route path="/checkout" element={<Protegida><Checkout /></Protegida>} />
