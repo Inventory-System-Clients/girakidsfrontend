@@ -64,18 +64,24 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
   const ir = (d) => setIndice((i) => (i + d + total) % total);
   const destinoDe = (b) => b.categoria || b.busca || b.produtoId;
 
-  const imagem = (b, eager) => (
+  const foto = (b, eager, className, alt = b.alt || "") => (
     <picture>
       {b.imagemMobileUrl && <source media="(max-width: 640px)" srcSet={b.imagemMobileUrl} />}
-      <img
-        src={b.imagemUrl}
-        alt={b.alt || ""}
-        className={cx("aspect-[16/9] w-full object-cover sm:aspect-[3/1]", faixa && "sm:max-h-[70vh]")}
-        loading={eager ? "eager" : "lazy"}
-        draggable={false}
-      />
+      <img src={b.imagemUrl} alt={alt} className={className} loading={eager ? "eager" : "lazy"} draggable={false} />
     </picture>
   );
+
+  // Na faixa a altura é limitada para não empurrar o catálogo: a arte aparece
+  // inteira no centro e as laterais são preenchidas com ela mesma desfocada.
+  const imagem = (b, eager) =>
+    faixa ? (
+      <div className="relative h-[clamp(140px,17vw,320px)] w-full overflow-hidden">
+        {foto(b, eager, "absolute inset-0 h-full w-full scale-110 object-cover opacity-80 blur-2xl", "")}
+        {foto(b, eager, "relative mx-auto h-full w-full object-contain")}
+      </div>
+    ) : (
+      foto(b, eager, "aspect-[16/9] w-full object-cover sm:aspect-[3/1]")
+    );
 
   return (
     <section
@@ -115,8 +121,8 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
           type="button"
           onClick={() => onAbrir(atual)}
           className={cx(
-            "absolute bottom-4 inline-flex items-center gap-1 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-primary shadow-md transition hover:scale-[1.03] sm:bottom-6",
-            faixa ? "left-4 sm:left-8 lg:left-12" : "left-4 sm:left-6",
+            "absolute inline-flex items-center gap-1 rounded-full bg-white/95 font-semibold text-primary shadow-md transition hover:scale-[1.03]",
+            faixa ? "bottom-2 left-3 px-3 py-1 text-xs sm:bottom-5 sm:left-8 sm:px-4 sm:py-2 sm:text-sm lg:left-12" : "bottom-4 left-4 px-4 py-2 text-sm sm:bottom-6 sm:left-6",
           )}
         >
           {atual.textoBotao || "Ver coleção"} <span aria-hidden="true">›</span>
@@ -130,7 +136,7 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
           <button type="button" onClick={() => ir(1)} className={cx("absolute top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white", faixa ? "right-3 sm:right-5" : "right-2")} aria-label="Próximo destaque">
             <ChevronRight className="h-5 w-5" />
           </button>
-          <div className={cx("absolute bottom-4 flex gap-1.5 sm:bottom-6", faixa ? "right-4 sm:right-8 lg:right-12" : "right-4")}>
+          <div className={cx("absolute flex gap-1.5", faixa ? "right-3 bottom-2 sm:right-8 sm:bottom-5 lg:right-12" : "right-4 bottom-4 sm:bottom-6")}>
             {banners.map((b, i) => (
               <button
                 key={b.id}
