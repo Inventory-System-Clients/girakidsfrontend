@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ChevronDown, ChevronUp, Download, Search } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { BarChart3, ChevronDown, ChevronUp, Download, Search } from "lucide-react";
+import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import api, { mensagemErro } from "../services/api";
 import {
   Badge,
@@ -25,6 +25,8 @@ import {
   useToast,
 } from "../components/ui";
 import AcoesPedido from "../components/pedido/AcoesPedido";
+import RankingProdutos from "../components/dashboard/RankingProdutos";
+import Analise from "../components/dashboard/Analise";
 import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaFinanceiro, CelulaMetodo, CelulaNumero, CelulaVendas } from "../components/pedido/StatusCelulas";
 import { dataHora, exportarCsv, hojeISO, inicioMesISO, lerNumero, moeda, numero, percentual } from "../utils/format";
 import { FINANCEIRO, FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
@@ -150,66 +152,13 @@ function Resumo({ periodo }) {
 
       <section>
         <h2 className="text-lg font-semibold">Produtos em destaque</h2>
-        <p className="mb-3 text-sm text-muted-foreground">Top 10 do período por quantidade vendida e por margem de lucro.</p>
+        <p className="mb-3 text-sm text-muted-foreground">Todos os produtos do período por quantidade vendida e por margem de lucro — filtre Top 10, Top 3 ou o mais.</p>
         <div className="grid gap-4 lg:grid-cols-2">
-          <TopProdutos titulo="Top 10 por quantidade vendida" descricao="Itens com maior volume vendido em pedidos expedidos." dados={d.topQuantidade} chave="pacotes" cor={AZUL} colunas={[["Qtd.", (x) => `${numero(x.pacotes)} un.`], ["Receita", (x) => moeda(x.receita)]]} />
-          <TopProdutos titulo="Top 10 por margem de lucro" descricao="Itens expedidos com custo totalmente coberto, ordenados pela margem percentual." dados={d.topMargem} chave="margemPercentual" cor={VERDE} colunas={[["Margem", (x) => percentual(x.margemPercentual)], ["Receita", (x) => moeda(x.receita)], ["Lucro", (x) => moeda(x.lucro)]]} />
+          <RankingProdutos titulo="Por quantidade vendida" descricao="Itens com maior volume vendido em pedidos expedidos." dados={d.topQuantidade} chave="pacotes" cor={AZUL} colunas={[["Qtd.", (x) => `${numero(x.pacotes)} un.`], ["Receita", (x) => moeda(x.receita)]]} />
+          <RankingProdutos titulo="Por margem de lucro" descricao="Itens expedidos com custo totalmente coberto, ordenados pela margem percentual." dados={d.topMargem} chave="margemPercentual" cor={VERDE} colunas={[["Margem", (x) => percentual(x.margemPercentual)], ["Receita", (x) => moeda(x.receita)], ["Lucro", (x) => moeda(x.lucro)]]} />
         </div>
       </section>
     </div>
-  );
-}
-
-function TopProdutos({ titulo, descricao, dados, chave, cor, colunas }) {
-  return (
-    <Card className="p-5">
-      <p className="font-semibold">{titulo}</p>
-      <p className="mb-3 text-sm text-muted-foreground">{descricao}</p>
-      {dados.length ? (
-        <>
-          <div className="h-48">
-            <ResponsiveContainer>
-              <BarChart data={dados.slice(0, 5)} layout="vertical" margin={{ left: 10 }}>
-                <XAxis type="number" hide />
-                <YAxis type="category" dataKey="nome" width={110} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(v) => numero(v, chave === "margemPercentual" ? 2 : 0)} />
-                <Bar dataKey={chave} fill={cor} radius={[0, 4, 4, 0]} barSize={14} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-3 overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs text-muted-foreground uppercase">
-                <tr>
-                  <th className="px-3 py-2 text-left">#</th>
-                  <th className="px-3 py-2 text-left">Produto</th>
-                  {colunas.map(([c]) => (
-                    <th key={c} className="px-3 py-2 text-right">
-                      {c}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {dados.map((x, i) => (
-                  <tr key={x.produtoId || x.nome} className="border-t border-border">
-                    <td className="px-3 py-2">{i + 1}</td>
-                    <td className="px-3 py-2">{x.nome}</td>
-                    {colunas.map(([c, f]) => (
-                      <td key={c} className="px-3 py-2 text-right whitespace-nowrap">
-                        {f(x)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : (
-        <p className="py-8 text-center text-sm text-muted-foreground">Sem dados no período.</p>
-      )}
-    </Card>
   );
 }
 
@@ -693,6 +642,7 @@ const ABAS = [
   { value: "meta", label: "Meta" },
   { value: "pedidos", label: "Pedidos expedidos" },
   { value: "estoque", label: "Estoque" },
+  { value: "analise", label: "📊 Análise" },
 ];
 
 export default function Dashboard() {
@@ -707,7 +657,13 @@ export default function Dashboard() {
         titulo="Visão executiva de pedidos expedidos"
         subtitulo="Leitura consolidada de caixa, recebíveis, margem, estoque e operação."
         extra={<p className="mt-1 text-xs text-muted-foreground">Atualizado em {dataHora(atualizado)}</p>}
-      />
+      >
+        {aba !== "analise" && (
+          <Button variant="secondary" onClick={() => setParams({ view: "analise" })}>
+            <BarChart3 className="h-4 w-4" /> Análise de produtos
+          </Button>
+        )}
+      </PageHeader>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs abas={ABAS} ativa={aba} onChange={(v) => setParams({ view: v })} />
         <PeriodoPicker inicio={periodo.inicio} fim={periodo.fim} onChange={setPeriodo} />
@@ -716,6 +672,7 @@ export default function Dashboard() {
       {aba === "meta" && <Meta periodo={periodo} />}
       {aba === "pedidos" && <PedidosExpedidos periodo={periodo} />}
       {aba === "estoque" && <Estoque periodo={periodo} />}
+      {aba === "analise" && <Analise periodo={periodo} />}
     </div>
   );
 }
