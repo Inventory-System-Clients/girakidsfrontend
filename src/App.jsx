@@ -16,6 +16,7 @@ const Perfil = lazy(() => import("./pages/Perfil"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const HistoricoPedidos = lazy(() => import("./pages/HistoricoPedidos"));
 const Expedicao = lazy(() => import("./pages/Expedicao"));
+const MontagemPedido = lazy(() => import("./pages/MontagemPedido"));
 const Produtos = lazy(() => import("./pages/Produtos"));
 const Entradas = lazy(() => import("./pages/Entradas"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
@@ -53,6 +54,7 @@ export default function App() {
                   <Route path="/dashboard" element={<Protegida permissoes={["FINANCEIRO"]}><Dashboard /></Protegida>} />
                   <Route path="/historico-pedidos" element={<Protegida permissoes={["VENDAS"]}><HistoricoPedidos /></Protegida>} />
                   <Route path="/expedicao" element={<Protegida permissoes={["EXPEDICAO"]}><Expedicao /></Protegida>} />
+                  <Route path="/expedicao/:id" element={<Protegida permissoes={["EXPEDICAO"]}><MontagemPedido /></Protegida>} />
                   <Route path="/produtos" element={<Protegida permissoes={["PRODUTOS"]}><Produtos /></Protegida>} />
                   <Route path="/entradas" element={<Protegida permissoes={["ENTRADAS"]}><Entradas /></Protegida>} />
                   <Route path="/orcamentos" element={<Protegida permissoes={["ORCAMENTOS"]}><Checkout modo="orcamento" /></Protegida>} />

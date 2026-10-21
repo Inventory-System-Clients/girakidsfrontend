@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { FileDown, Image as ImageIcon } from "lucide-react";
+import { FileDown } from "lucide-react";
 import api, { mensagemErro } from "../../services/api";
 import { Badge, Button, Dialog, Spinner } from "../ui";
 import { carimbo, data, dataHora, mascaraDocumento, moeda, moedaUnitaria, pesoKg } from "../../utils/format";
 import { EXPEDICAO, FINANCEIRO, METODOS_ENVIO, VENDAS, nomeForma } from "../../utils/status";
 import { gerarPdfPedido } from "../../utils/pdf";
+import { GaleriaFotos } from "./Fotos";
 
 const Info = ({ rotulo, children }) => (
   <div className="flex gap-2 text-sm">
@@ -151,13 +152,8 @@ export default function PedidoDetalhes({ pedidoId, onFechar }) {
                   <p className="text-xs text-muted-foreground">
                     Itens conferidos: {pedido.checklist.conferidos} de {pedido.checklist.total}
                   </p>
-                  {pedido.expedidoEm && <p className="text-xs text-muted-foreground">{pedido.expedidoPor} · {carimbo(pedido.expedidoEm)}</p>}
-                  {pedido.observacoesExpedicao && <p className="mt-1 text-xs">Obs.: {pedido.observacoesExpedicao}</p>}
-                  {pedido.imagemExpedicaoUrl && (
-                    <a href={pedido.imagemExpedicaoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary">
-                      <ImageIcon className="h-3 w-3" /> Foto da expedição
-                    </a>
-                  )}
+                  {pedido.montagemConcluidaEm && <p className="text-xs text-muted-foreground">Montagem: {pedido.montagemConcluidaPor} · {carimbo(pedido.montagemConcluidaEm)}</p>}
+                  {pedido.expedidoEm && <p className="text-xs text-muted-foreground">Expedição: {pedido.expedidoPor} · {carimbo(pedido.expedidoEm)}</p>}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
@@ -168,6 +164,32 @@ export default function PedidoDetalhes({ pedidoId, onFechar }) {
                 {pedido.statusExpedicao !== "NAO_INICIADO" && <Badge variant="primary">{EXPEDICAO[pedido.statusExpedicao]}</Badge>}
               </div>
               {pedido.motivoCancelamento && <p className="text-sm text-red-600">Cancelado por {pedido.canceladoPor}: {pedido.motivoCancelamento}</p>}
+            </Bloco>
+          )}
+
+          {pedido.tipo === "PEDIDO" && pedido.statusVendas === "LIBERADO" && (
+            <Bloco titulo="Montagem e expedição">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Info rotulo="Itens conferidos">
+                  {pedido.checklist.conferidos} de {pedido.checklist.total}
+                </Info>
+                <Info rotulo="Montagem concluída">{pedido.montagemConcluidaEm ? `${pedido.montagemConcluidaPor} · ${carimbo(pedido.montagemConcluidaEm)}` : "Não"}</Info>
+                <Info rotulo="Expedido">{pedido.expedidoEm ? `${pedido.expedidoPor} · ${carimbo(pedido.expedidoEm)}` : "Não"}</Info>
+                <Info rotulo="Liberado por">{pedido.liberadoPor ? `${pedido.liberadoPor} · ${carimbo(pedido.liberadoEm)}` : null}</Info>
+              </div>
+              {(pedido.observacoes || pedido.observacaoLiberacao || pedido.observacoesExpedicao || pedido.transportadoraObs) && (
+                <div className="mt-2 space-y-1 rounded-md bg-amber-50 p-3 text-sm">
+                  {pedido.observacoes && <p><strong>Observações do pedido:</strong> {pedido.observacoes}</p>}
+                  {pedido.observacaoLiberacao && <p><strong>Observação do time de vendas:</strong> {pedido.observacaoLiberacao}</p>}
+                  {pedido.observacoesExpedicao && <p><strong>Observações da expedição:</strong> {pedido.observacoesExpedicao}</p>}
+                  {pedido.transportadoraObs && <p><strong>Observações da transportadora:</strong> {pedido.transportadoraObs}</p>}
+                </div>
+              )}
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <GaleriaFotos titulo="Fotos do pedido" fotos={pedido.imagensExpedicao} />
+                <GaleriaFotos titulo="Fotos da transportadora" fotos={pedido.imagensTransportadora} />
+              </div>
+              {!pedido.imagensExpedicao?.length && !pedido.imagensTransportadora?.length && <p className="text-xs text-muted-foreground">Nenhuma foto anexada.</p>}
             </Bloco>
           )}
 
@@ -219,6 +241,7 @@ export default function PedidoDetalhes({ pedidoId, onFechar }) {
                 <thead className="text-xs text-muted-foreground uppercase">
                   <tr className="border-b border-border">
                     <th className="py-2 text-left">Produto</th>
+                    {pedido.tipo === "PEDIDO" && <th>Conferência</th>}
                     <th>SKU</th>
                     <th>Emb.</th>
                     <th>Qtd</th>
@@ -230,11 +253,30 @@ export default function PedidoDetalhes({ pedidoId, onFechar }) {
                   {pedido.itens.map((i) => (
                     <tr key={i.id} className="border-b border-border/60">
                       <td className="py-2">
-                        <p className="font-medium">{i.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {i.categoria} · Embalagens: {i.quantidade} x {i.unidadesPacote} un. = {i.quantidade * i.unidadesPacote} un.
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <span className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+                            {i.imagemUrl && <img src={i.imagemUrl} alt="" className="h-full w-full object-cover" />}
+                          </span>
+                          <span>
+                            <span className="block font-medium">{i.nome}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {i.categoria} · Embalagens: {i.quantidade} x {i.unidadesPacote} un. = {i.quantidade * i.unidadesPacote} un.
+                            </span>
+                          </span>
+                        </div>
                       </td>
+                      {pedido.tipo === "PEDIDO" && (
+                        <td className="text-center text-xs">
+                          {i.conferido ? (
+                            <span className="text-emerald-700">
+                              ✓ {i.conferidoPor || "Conferido"}
+                              {i.conferidoEm && <span className="block text-muted-foreground">{carimbo(i.conferidoEm)}</span>}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Pendente</span>
+                          )}
+                        </td>
+                      )}
                       <td className="text-center">{i.sku || "-"}</td>
                       <td className="text-center">{i.quantidade}</td>
                       <td className="text-center">{i.quantidade * i.unidadesPacote}</td>

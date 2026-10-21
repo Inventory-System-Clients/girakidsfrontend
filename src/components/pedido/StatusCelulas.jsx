@@ -70,7 +70,11 @@ export const CelulaExpedicao = ({ pedido }) =>
     "-"
   ) : (
     <span className="inline-flex flex-col items-center">
-      {pedido.statusExpedicao === "NAO_INICIADO" ? "-" : EXPEDICAO[pedido.statusExpedicao]}
+      {pedido.statusExpedicao === "NAO_INICIADO"
+        ? "-"
+        : pedido.statusExpedicao === "MONTAGEM" && pedido.montagemConcluidaEm
+          ? "Montagem concluída"
+          : EXPEDICAO[pedido.statusExpedicao]}
       {pedido.statusExpedicao === "EXPEDIDO" && <Carimbo quem={pedido.expedidoPor} quando={pedido.expedidoEm} />}
     </span>
   );

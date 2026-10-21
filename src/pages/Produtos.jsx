@@ -40,7 +40,9 @@ function GaleriaImagens({ imagens, onChange, desabilitado }) {
   const toast = useToast();
   const [enviando, setEnviando] = useState(0);
   const atual = useRef(imagens);
-  atual.current = imagens;
+  useEffect(() => {
+    atual.current = imagens;
+  }, [imagens]);
 
   const enviar = async (arquivos) => {
     const lista = [...(arquivos || [])].filter((a) => a.type.startsWith("image/"));

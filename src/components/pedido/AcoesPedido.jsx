@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Ban,
   CheckCircle2,
@@ -20,8 +21,9 @@ import api, { enviarArquivo, mensagemErro } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { Badge, Button, Checkbox, Dialog, Field, Input, RowMenu, Select, Textarea, useConfirm, useToast } from "../ui";
 import PedidoDetalhes from "./PedidoDetalhes";
+import { FotosUpload } from "./Fotos";
 import { EditorMescla } from "../../pages/Checkout";
-import { comprimirImagem, data, hojeISO, lerNumero, moeda } from "../../utils/format";
+import { data, hojeISO, lerNumero, moeda } from "../../utils/format";
 import { FORMAS_PAGAMENTO, nomeForma } from "../../utils/status";
 import { gerarPdfPedido } from "../../utils/pdf";
 
@@ -502,134 +504,50 @@ function NotaFiscalDialog({ pedido, onFechar, onFeito }) {
   );
 }
 
-export function ChecklistDialog({ pedido: inicial, onFechar, onFeito }) {
-  const [pedido, setPedido] = useState(inicial);
-  const [obs, setObs] = useState(inicial.observacoesExpedicao || "");
-  const toast = useToast();
-  useEffect(() => {
-    api.get(`/pedidos/${inicial.id}`).then(({ data: d }) => setPedido(d));
-  }, [inicial.id]);
-
-  const marcar = async (item, conferido) => {
-    try {
-      const { data: d } = await api.put(`/expedicao/${pedido.id}/itens/${item.id}`, { conferido });
-      setPedido(d);
-      onFeito(d, false);
-    } catch (error) {
-      toast({ titulo: "Erro ao atualizar item", descricao: mensagemErro(error), tipo: "erro" });
-    }
-  };
-  const salvarObs = async () => {
-    try {
-      const { data: d } = await api.put(`/expedicao/${pedido.id}/observacoes`, { observacoes: obs });
-      onFeito(d, false);
-      toast({ titulo: "Observações salvas", descricao: "As observações da expedição foram atualizadas" });
-    } catch (error) {
-      toast({ titulo: "Erro ao salvar observações", descricao: mensagemErro(error), tipo: "erro" });
-    }
-  };
-  const progresso = pedido.checklist ? Math.round((pedido.checklist.conferidos / Math.max(1, pedido.checklist.total)) * 100) : 0;
-
-  return (
-    <Dialog aberto onFechar={onFechar} tamanho="lg" titulo={`Checklist de Montagem - Pedido ${pedido.numeroFormatado}`} descricao="Confira cada item do pedido marcando os checkboxes conforme separa os produtos.">
-      <div className="space-y-4">
-        <div>
-          <div className="mb-1 flex justify-between text-sm">
-            <span>Progresso da conferência</span>
-            <span className="font-semibold">
-              {pedido.checklist?.conferidos} de {pedido.checklist?.total}
-            </span>
-          </div>
-          <div className="h-2 rounded-full bg-muted">
-            <div className="h-2 rounded-full bg-emerald-500 transition-all" style={{ width: `${progresso}%` }} />
-          </div>
-        </div>
-        <div className="space-y-2">
-          {pedido.itens?.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-              <Checkbox checked={item.conferido} onChange={(v) => marcar(item, v)} />
-              {item.imagemUrl && <img src={item.imagemUrl} alt="" className="h-12 w-12 rounded object-cover" />}
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{item.nome || "Nome não disponível"}</p>
-                <p className="text-xs text-muted-foreground">
-                  {item.categoria} · {item.quantidade} x {item.unidadesPacote} un. = {item.quantidade * item.unidadesPacote} un.
-                </p>
-              </div>
-              {item.conferido && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-            </div>
-          ))}
-        </div>
-        {pedido.checklist?.completo && (
-          <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
-            <strong>Todos os itens foram conferidos!</strong> O pedido está pronto para ser marcado como expedido.
-          </p>
-        )}
-        {pedido.observacoes && <p className="rounded-md bg-slate-50 p-3 text-sm">Observações do pedido: {pedido.observacoes}</p>}
-        <Field label="Observações da expedição" dica="Use este campo para registrar informações internas da logística.">
-          <Textarea value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Observações internas da expedição..." />
-        </Field>
-        <Button variant="outline" onClick={salvarObs}>
-          Salvar observações
-        </Button>
-      </div>
-    </Dialog>
-  );
-}
-
 function ExpedirDialog({ pedido, onFechar, onFeito }) {
-  const [imagem, setImagem] = useState("");
+  const [fotosPedido, setFotosPedido] = useState(pedido.imagensExpedicao || []);
+  const [fotosTransportadora, setFotosTransportadora] = useState(pedido.imagensTransportadora || []);
   const [obs, setObs] = useState(pedido.observacoesExpedicao || "");
-  const [processando, setProcessando] = useState(false);
+  const [enviando, setEnviando] = useState(false);
   const toast = useToast();
-  const selecionar = async (arquivo) => {
-    if (!arquivo) return;
-    if (!arquivo.type.startsWith("image/")) return toast({ titulo: "Arquivo inválido", descricao: "Por favor, selecione uma imagem", tipo: "erro" });
-    if (arquivo.size > 15 * 1024 * 1024) return toast({ titulo: "Arquivo muito grande", descricao: "A imagem deve ter no máximo 15MB", tipo: "erro" });
-    setProcessando(true);
-    try {
-      setImagem(await enviarArquivo(await comprimirImagem(arquivo), "expedicao"));
-    } catch {
-      toast({ titulo: "Erro ao processar imagem", descricao: "Tente selecionar outra imagem", tipo: "erro" });
-    } finally {
-      setProcessando(false);
-    }
-  };
   const confirmar = async () => {
+    setEnviando(true);
     try {
-      const { data: d } = await api.post(`/expedicao/${pedido.id}/expedir`, { imagemUrl: imagem || undefined, observacoes: obs });
+      const { data: d } = await api.post(`/expedicao/${pedido.id}/expedir`, {
+        imagensExpedicao: fotosPedido,
+        imagensTransportadora: fotosTransportadora,
+        observacoes: obs,
+      });
       toast({ titulo: "Pedido expedido com sucesso" });
       onFeito(d);
     } catch (error) {
       toast({ titulo: "Erro ao expedir pedido", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setEnviando(false);
     }
   };
   return (
     <Dialog
       aberto
       onFechar={onFechar}
+      tamanho="lg"
       titulo={`Expedir pedido ${pedido.numeroFormatado}`}
-      descricao="Anexe uma imagem e observações sobre a expedição do pedido."
+      descricao="Anexe as fotos do pedido e da transportadora (câmera ou galeria, várias de cada) e as observações da expedição."
       rodape={
         <>
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button variant="success" disabled={processando} onClick={confirmar}>
+          <Button variant="success" loading={enviando} onClick={confirmar}>
             Confirmar Expedição
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Field label="Imagem do Pedido (Opcional)" dica="Anexe uma foto do pedido embalado para o cliente visualizar.">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-border p-6 text-sm text-muted-foreground hover:border-primary">
-            {imagem ? <img src={imagem} alt="" className="max-h-48 rounded" /> : <Upload className="h-6 w-6" />}
-            {processando ? "Processando imagem..." : imagem ? "Trocar imagem" : "Clique para selecionar uma imagem"}
-            <span className="text-xs">PNG, JPG até 15MB (será comprimida automaticamente)</span>
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => selecionar(e.target.files?.[0])} />
-          </label>
-        </Field>
-        <Field label="Observações">
+        <FotosUpload titulo="Fotos do pedido" descricao="Pedido montado/embalado." fotos={fotosPedido} onChange={setFotosPedido} />
+        <FotosUpload titulo="Fotos da transportadora" descricao="Coleta, entrega na transportadora ou comprovante." fotos={fotosTransportadora} onChange={setFotosTransportadora} />
+        <Field label="Observações da expedição">
           <Textarea value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Observações sobre a expedição..." />
         </Field>
       </div>
@@ -762,6 +680,7 @@ function EditarPedidoDialog({ pedido, onFechar, onFeito }) {
 // "expedicao" | "leitura".
 export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado }) {
   const { pode } = useAuth();
+  const navigate = useNavigate();
   const confirmar = useConfirm();
   const toast = useToast();
   const [dialogo, setDialogo] = useState(null);
@@ -814,11 +733,11 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
   };
 
   const desfazer = async () => {
-    const ok = await confirmar({ titulo: "Desfazer checklist?", mensagem: "Todos os itens voltam para não conferidos e o pedido volta para 'Iniciar Montagem'.", perigo: true, confirmar: "Desfazer" });
+    const ok = await confirmar({ titulo: "Desfazer montagem?", mensagem: "Todos os itens voltam para não conferidos e o pedido volta para 'Iniciar Montagem'.", perigo: true, confirmar: "Desfazer" });
     if (!ok) return;
     try {
       const { data: d } = await api.post(`/expedicao/${pedido.id}/desfazer`);
-      toast({ titulo: "Checklist desfeito" });
+      toast({ titulo: "Montagem desfeita" });
       feito(d);
     } catch (error) {
       toast({ titulo: "Erro", descricao: mensagemErro(error), tipo: "erro" });
@@ -839,9 +758,9 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
         ? [
             { label: "Ver pedido", icone: Eye, onClick: () => setVerId(pedido.id) },
             { label: "Baixar PDF", icone: FileDown, onClick: baixarPdf },
-            !expedido && { label: "Ver Checklist", icone: ListChecks, onClick: () => setDialogo({ nome: "checklist", pedido }) },
-            pedido.checklist?.conferidos > 0 && !expedido && { label: "Desfazer checklist", icone: Undo2, onClick: desfazer },
-            !expedido && { label: "Expedir", icone: Truck, disabled: !pedido.checklist?.completo, onClick: () => setDialogo({ nome: "expedir", pedido }) },
+            { label: expedido ? "Ver montagem e fotos" : "Montar pedido", icone: ListChecks, onClick: () => navigate(`/expedicao/${pedido.id}`) },
+            pedido.checklist?.conferidos > 0 && !expedido && { label: "Desfazer montagem", icone: Undo2, onClick: desfazer },
+            !expedido && { label: "Expedir", icone: Truck, disabled: !pedido.checklist?.completo, onClick: () => comCompleto("expedir") },
             { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
             { label: "Nota fiscal", icone: FileText, onClick: () => comCompleto("nota") },
           ]
@@ -875,7 +794,6 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
       {dialogo?.nome === "forma" && <FormaPagamentoDialog {...props} />}
       {dialogo?.nome === "transportadora" && <TransportadoraDialog {...props} />}
       {dialogo?.nome === "nota" && <NotaFiscalDialog {...props} />}
-      {dialogo?.nome === "checklist" && <ChecklistDialog {...props} />}
       {dialogo?.nome === "expedir" && <ExpedirDialog {...props} />}
       {dialogo?.nome === "editar" && <EditarPedidoDialog {...props} />}
     </>
