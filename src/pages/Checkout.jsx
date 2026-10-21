@@ -262,14 +262,27 @@ export default function Checkout({ modo = "pedido" }) {
         transportadoraObs: metodoEnvio === "TRANSPORTADORA" ? transportadoraObs : null,
         observacoes,
       };
+      // Cliente novo: a conta é criada com os dados do pedido (senha padrão).
+      const avisarCadastro = (data) => {
+        const c = data.clienteCadastro;
+        if (!c?.criado) return;
+        toast({
+          titulo: "Cliente cadastrado ✅",
+          descricao: c.emailGerado
+            ? "Os dados ficaram salvos para os próximos pedidos (sem e-mail informado, o cliente não entra no site)."
+            : `Login: ${c.email} · senha: ${c.senhaPadrao}. Da próxima vez os dados são preenchidos automaticamente.`,
+        });
+      };
       if (orcamento) {
         const { data } = await api.post("/orcamentos", corpo);
+        avisarCadastro(data);
         setOrcamentoGerado(data);
         await gerarPdfPedido(data).catch(() => toast({ titulo: "Orçamento salvo sem PDF", tipo: "aviso" }));
         limpar();
         escolherCliente(null);
       } else {
         const { data } = await api.post("/pedidos", corpo);
+        if (interno) avisarCadastro(data);
         limpar();
         if (interno) escolherCliente(null);
         if (usarCredito) api.get("/auth/perfil").then(({ data: u }) => atualizarUsuario(u)).catch(() => {});
@@ -291,6 +304,11 @@ export default function Checkout({ modo = "pedido" }) {
           <p className="mt-1 text-sm text-muted-foreground">Use o código abaixo para reenviar o PDF ao cliente ou carregar esse orçamento novamente.</p>
           <p className="mt-6 text-sm text-muted-foreground">Código do orçamento</p>
           <p className="text-4xl font-bold tracking-widest text-primary">{orcamentoGerado.numeroFormatado}</p>
+          {orcamentoGerado.clienteCadastro?.criado && !orcamentoGerado.clienteCadastro.emailGerado && (
+            <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+              Cliente cadastrado — login <strong>{orcamentoGerado.clienteCadastro.email}</strong>, senha <strong>{orcamentoGerado.clienteCadastro.senhaPadrao}</strong>.
+            </p>
+          )}
           <div className="mt-6 flex flex-wrap justify-center gap-2">
             <Button variant="outline" onClick={() => navigator.clipboard.writeText(orcamentoGerado.numeroFormatado).then(() => toast({ titulo: "Código copiado" }))}>
               <Copy className="h-4 w-4" /> Copiar código
