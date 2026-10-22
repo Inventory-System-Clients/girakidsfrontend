@@ -4,8 +4,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import api from "../services/api";
 import { cx } from "./ui";
 
-const TROCA_MS = 10000;
-const TROCA_FAIXA_MS = 7000;
+// Troca automática a cada 4 s (o tempo recomeça ao trocar pelas setas/bolinhas).
+const TROCA_MS = 4000;
 
 // Onde os banners aparecem no catálogo (configurável em Banners):
 // FAIXA = largura toda no lugar do título; CLASSICO = cartão acima dos produtos.
@@ -40,7 +40,6 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
   const faixa = variante === "faixa";
   const [banners, setBanners] = useState(null);
   const [indice, setIndice] = useState(0);
-  const [pausado, setPausado] = useState(false);
   const toqueX = useRef(null);
 
   useEffect(() => {
@@ -52,10 +51,10 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
 
   const total = banners?.length || 0;
   useEffect(() => {
-    if (total <= 1 || pausado) return undefined;
-    const t = setInterval(() => setIndice((i) => (i + 1) % total), faixa ? TROCA_FAIXA_MS : TROCA_MS);
-    return () => clearInterval(t);
-  }, [total, pausado, faixa]);
+    if (total <= 1) return undefined;
+    const t = setTimeout(() => setIndice((i) => (i + 1) % total), TROCA_MS);
+    return () => clearTimeout(t);
+  }, [total, indice]);
 
   if (!banners) return null;
   if (!total) return vazio;
@@ -87,8 +86,6 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
     <section
       aria-label="Destaques"
       className={cx("relative overflow-hidden bg-slate-100", faixa ? "border-b border-border" : "mb-5 rounded-2xl shadow-sm")}
-      onMouseEnter={() => setPausado(true)}
-      onMouseLeave={() => setPausado(false)}
       onTouchStart={(e) => (toqueX.current = e.touches[0].clientX)}
       onTouchEnd={(e) => {
         const dx = e.changedTouches[0].clientX - (toqueX.current ?? 0);
