@@ -78,7 +78,7 @@ function BannerForm({ banner, categorias, onFechar, onSalvo }) {
       onFechar={onFechar}
       tamanho="lg"
       titulo={banner?.id ? "Editar banner" : "Novo banner"}
-      descricao="Use uma arte pronta (sem botão desenhado). O botão real é colocado por cima, no canto inferior."
+      descricao="Use uma arte pronta. Clicar no banner leva ao destino escolhido abaixo."
       rodape={
         <>
           <Button variant="outline" onClick={onFechar}>
@@ -96,15 +96,12 @@ function BannerForm({ banner, categorias, onFechar, onSalvo }) {
           <UploadArte label="Arte para celular (opcional)" dica={faixa ? "Faixa no celular: 1200 × 430 px (proporção 2,8:1)" : "Proporção 16:9, ex.: 1200 × 675 px"} valor={b.imagemMobileUrl} onChange={set("imagemMobileUrl")} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Texto do botão">
-            <Input value={b.textoBotao || ""} onChange={set("textoBotao")} maxLength={60} placeholder="Ver coleção" />
-          </Field>
           <Field label="Descrição da imagem (acessibilidade)">
             <Input value={b.alt || ""} onChange={set("alt")} placeholder="Ex.: Lançamento Pokémon 2 polegadas" />
           </Field>
-          <Field label="O botão leva para">
+          <Field label="Ao clicar no banner, leva para">
             <Select value={b.destino} onChange={set("destino")}>
-              <option value="nenhum">Sem botão (só imagem)</option>
+              <option value="nenhum">Nada (só imagem)</option>
               <option value="categoria">Uma categoria</option>
               <option value="busca">Uma busca por texto</option>
               <option value="produto">Um produto</option>
@@ -211,11 +208,11 @@ export default function Banners() {
     carregar();
   };
 
-  const destino = (b) => (b.produtoId ? "Produto" : b.categoria ? `Categoria: ${b.categoria}` : b.busca ? `Busca: "${b.busca}"` : "Sem botão");
+  const destino = (b) => (b.produtoId ? "Produto" : b.categoria ? `Categoria: ${b.categoria}` : b.busca ? `Busca: "${b.busca}"` : "Sem destino");
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <PageHeader titulo="Banners do catálogo" subtitulo="Destaques no topo do catálogo: trocam sozinhos, com botão para uma categoria, busca ou produto.">
+      <PageHeader titulo="Banners do catálogo" subtitulo="Destaques no topo do catálogo: trocam sozinhos; clicar no banner leva a uma categoria, busca ou produto.">
         <Button onClick={() => setForm(null)}>
           <Plus className="h-4 w-4" /> Novo banner
         </Button>
@@ -246,7 +243,7 @@ export default function Banners() {
             <div className="min-w-0 flex-1">
               <p className="font-semibold">{b.alt || "Banner sem descrição"}</p>
               <p className="text-sm text-muted-foreground">
-                Botão: <strong>{b.textoBotao || "Ver coleção"}</strong> → {destino(b)}
+                Ao clicar → {destino(b)}
               </p>
               <div className="mt-1 flex gap-2">
                 <Badge variant={b.ativo ? "success" : "default"}>{b.ativo ? "Ativo" : "Desativado"}</Badge>

@@ -33,8 +33,8 @@ export function useLayoutBanner() {
 }
 
 // Destaques do catálogo (mesmo funcionamento da Prime Plush): arte pronta,
-// troca automática, setas, bolinhas e botão que leva a uma categoria, busca
-// ou produto. Na variante "faixa" ocupa a largura toda e desliza suavemente;
+// troca automática, setas e bolinhas. Clicar no banner leva à categoria,
+// busca ou produto escolhido no cadastro. Na variante "faixa" ocupa a largura toda e desliza suavemente;
 // sem banners mostra "vazio".
 export default function BannerCarrossel({ onAbrir, variante = "classico", vazio = null }) {
   const faixa = variante === "faixa";
@@ -114,18 +114,6 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
       ) : (
         <button type="button" className={cx("block w-full", !destinoDe(atual) && "cursor-default")} onClick={() => destinoDe(atual) && onAbrir(atual)} aria-label={atual.alt || "Destaque"}>
           {imagem(atual, true)}
-        </button>
-      )}
-      {destinoDe(atual) && (
-        <button
-          type="button"
-          onClick={() => onAbrir(atual)}
-          className={cx(
-            "absolute inline-flex items-center gap-1 rounded-full bg-white/95 font-semibold text-primary shadow-md transition hover:scale-[1.03]",
-            faixa ? "bottom-2 left-3 px-3 py-1 text-xs sm:bottom-5 sm:left-8 sm:px-4 sm:py-2 sm:text-sm lg:left-12" : "bottom-4 left-4 px-4 py-2 text-sm sm:bottom-6 sm:left-6",
-          )}
-        >
-          {atual.textoBotao || "Ver coleção"} <span aria-hidden="true">›</span>
         </button>
       )}
       {total > 1 && (
