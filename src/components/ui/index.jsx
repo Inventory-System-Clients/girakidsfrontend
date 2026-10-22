@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { contemTexto } from "../../utils/format";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -428,7 +429,7 @@ export function RowMenu({ itens }) {
 export function FiltroMulti({ titulo, opcoes, valores, onChange }) {
   const [busca, setBusca] = useState("");
   const selecionados = new Set(valores);
-  const filtradas = Object.entries(opcoes).filter(([, label]) => label.toLowerCase().includes(busca.toLowerCase()));
+  const filtradas = Object.entries(opcoes).filter(([, label]) => contemTexto(label, busca));
   return (
     <Popover
       gatilho={

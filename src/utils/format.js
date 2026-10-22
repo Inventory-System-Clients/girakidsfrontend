@@ -32,6 +32,14 @@ export const inicioMesISO = () => `${hojeISO().slice(0, 8)}01`;
 
 export const somenteDigitos = (v) => String(v || "").replace(/\D/g, "");
 
+// Para comparar textos em buscas sem acento e sem maiúsculas ("pelucia" = "Pelúcia").
+export const semAcento = (v) =>
+  String(v ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+export const contemTexto = (texto, termo) => semAcento(texto).includes(semAcento(termo).trim());
+
 export const mascaraDocumento = (v) => {
   const d = somenteDigitos(v).slice(0, 14);
   if (d.length <= 11) {

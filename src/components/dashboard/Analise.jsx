@@ -3,7 +3,7 @@ import { AlertTriangle, Boxes, Crown, Package, Percent, Search, TrendingDown, Tr
 import api from "../../services/api";
 import { Badge, Card, Segmented, Skeleton, cx } from "../ui";
 import RankingProdutos from "./RankingProdutos";
-import { moeda, moedaUnitaria, numero, percentual } from "../../utils/format";
+import { contemTexto, moeda, moedaUnitaria, numero, percentual } from "../../utils/format";
 
 const AZUL = "#2563eb";
 const VERDE = "#0f766e";
@@ -73,10 +73,10 @@ function ProdutosAtivos() {
 
   const lista = useMemo(() => {
     if (!d) return [];
-    const termo = busca.trim().toLowerCase();
+    const termo = busca.trim();
     return d.produtos
       .filter((p) => !categoria || p.categoria === categoria)
-      .filter((p) => !termo || p.nome.toLowerCase().includes(termo) || String(p.sku).toLowerCase().includes(termo))
+      .filter((p) => !termo || contemTexto(p.nome, termo) || contemTexto(p.sku, termo))
       .sort((a, b) => (ordem === "estoque" ? b.estoque - a.estoque : ordem === "menor" ? a.estoque - b.estoque : a.nome.localeCompare(b.nome, "pt-BR")));
   }, [d, categoria, busca, ordem]);
 

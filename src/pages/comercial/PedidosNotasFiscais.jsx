@@ -1,6 +1,7 @@
 import { CarregarPedidoLoja } from "../../components/comercial/CarregarPedidoLoja";
 import { useEffect, useRef, useState } from "react";
 import api from "../../services/api";
+import { contemTexto } from "../../utils/format";
 import { Navbar } from "../../components/Header";
 import { Footer } from "../../components/Header";
 import { PageHeader, Modal } from "../../components/comercial/UIComponents";
@@ -216,9 +217,7 @@ export function PedidosNotasFiscais() {
 
   const pickerNotasFiltradas = pickerBusca.trim()
     ? pickerNotas.filter((nota) =>
-        (nota.clienteNome || "")
-          .toLowerCase()
-          .includes(pickerBusca.trim().toLowerCase()),
+        contemTexto(nota.clienteNome, pickerBusca),
       )
     : pickerNotas;
 

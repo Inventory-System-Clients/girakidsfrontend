@@ -3,7 +3,7 @@ import { CheckCircle2, Globe, Search, Sparkles, Truck } from "lucide-react";
 import api, { mensagemErro } from "../../services/api";
 import { Badge, Button, Field, Input, Skeleton, Textarea, cx, useToast } from "../ui";
 import { BotaoWhatsapp } from "../Whatsapp";
-import { UFS, numero } from "../../utils/format";
+import { UFS, contemTexto, numero } from "../../utils/format";
 
 // Equipe escolhendo "Transportadora" no checkout: sugere as que atendem a UF
 // do cliente (planilha interna + Parceiros + já usadas para o estado) e
@@ -28,8 +28,7 @@ export default function SeletorTransportadora({ uf, cidade, pesoGramas, selecion
   }, [uf]);
 
   const filtrar = (lista) => {
-    const t = filtro.trim().toLowerCase();
-    return t ? lista.filter((x) => x.nome.toLowerCase().includes(t)) : lista;
+    return filtro.trim() ? lista.filter((x) => contemTexto(x.nome, filtro)) : lista;
   };
   const atendem = useMemo(() => filtrar(dados?.atendem || []), [dados, filtro]); // eslint-disable-line react-hooks/exhaustive-deps
   const outras = useMemo(() => filtrar(dados?.outras || []), [dados, filtro]); // eslint-disable-line react-hooks/exhaustive-deps

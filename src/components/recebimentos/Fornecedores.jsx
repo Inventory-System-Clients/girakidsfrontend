@@ -3,7 +3,7 @@ import { Pencil, Plus, Search, Truck } from "lucide-react";
 import api, { mensagemErro } from "../../services/api";
 import { Badge, Button, Dialog, EmptyState, Field, Input, Switch, Table, Td, Textarea, Th, useToast } from "../ui";
 import { BotaoWhatsapp } from "../Whatsapp";
-import { mascaraDocumento, mascaraTelefone } from "../../utils/format";
+import { contemTexto, mascaraDocumento, mascaraTelefone } from "../../utils/format";
 
 export function FornecedorForm({ fornecedor, onFechar, onSalvo }) {
   const toast = useToast();
@@ -74,7 +74,7 @@ export function FornecedorForm({ fornecedor, onFechar, onSalvo }) {
 export default function Fornecedores({ fornecedores, onAtualizar }) {
   const [busca, setBusca] = useState("");
   const [form, setForm] = useState(undefined);
-  const lista = fornecedores.filter((f) => !busca || `${f.nome} ${f.documento || ""} ${f.contato || ""}`.toLowerCase().includes(busca.toLowerCase()));
+  const lista = fornecedores.filter((f) => !busca || contemTexto(`${f.nome} ${f.documento || ""} ${f.contato || ""}`, busca));
 
   return (
     <div>
