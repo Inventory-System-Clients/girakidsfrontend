@@ -21,6 +21,7 @@ import api, { enviarArquivo, mensagemErro } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { Badge, Button, Checkbox, Dialog, Field, Input, RowMenu, Select, Textarea, useConfirm, useToast } from "../ui";
 import PedidoDetalhes from "./PedidoDetalhes";
+import SeletorTransportadora from "../checkout/SeletorTransportadora";
 import { FotosUpload } from "./Fotos";
 import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
 import { EditorMescla } from "../../pages/Checkout";
@@ -94,6 +95,12 @@ function LiberarDialog({ pedido, modo, onFechar, onFeito }) {
               </>
             )}
           </p>
+          {(pedido.transportadoraCotacao || pedido.transportadoraCotacaoCom) && (
+            <p className="text-xs text-muted-foreground">
+              Cotação{pedido.transportadoraCotacao && ` nº ${pedido.transportadoraCotacao}`}
+              {pedido.transportadoraCotacaoCom && ` com ${pedido.transportadoraCotacaoCom}`}
+            </p>
+          )}
           {pedido.transportadoraObs && <p className="text-xs text-muted-foreground">Obs.: {pedido.transportadoraObs}</p>}
         </div>
         <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
@@ -406,53 +413,60 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
   );
 }
 
+// Escolhe/troca a transportadora com as mesmas sugestões do checkout (as que
+// atendem a UF do cliente), mais nº da cotação e com quem foi cotado.
 function TransportadoraDialog({ pedido, onFechar, onFeito }) {
-  const [lista, setLista] = useState([]);
-  const [id, setId] = useState(pedido.transportadoraId || "");
+  const [selecionada, setSelecionada] = useState(pedido.transportadoraId ? { id: pedido.transportadoraId, nome: pedido.transportadoraNome } : null);
   const [obs, setObs] = useState(pedido.transportadoraObs || "");
+  const [cotacao, setCotacao] = useState({ numero: pedido.transportadoraCotacao || "", com: pedido.transportadoraCotacaoCom || "" });
+  const [salvando, setSalvando] = useState(false);
   const toast = useToast();
-  useEffect(() => {
-    api.get("/parceiros", { params: { tipo: "TRANSPORTADORA", ativos: "true" } }).then(({ data: d }) => setLista(d));
-  }, []);
   const salvar = async () => {
+    setSalvando(true);
     try {
-      const { data: d } = await api.put(`/pedidos/${pedido.id}/transportadora`, { transportadoraId: id || null, observacoes: obs });
-      toast({ titulo: "Transportadora atualizada" });
+      const { data: d } = await api.put(`/pedidos/${pedido.id}/transportadora`, {
+        transportadora: selecionada,
+        observacoes: obs,
+        cotacao: cotacao.numero,
+        cotacaoCom: cotacao.com,
+      });
+      toast({ titulo: selecionada ? "Transportadora atualizada" : "Transportadora removida do pedido" });
       onFeito(d);
     } catch (error) {
       toast({ titulo: "Erro", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setSalvando(false);
     }
   };
   return (
     <Dialog
       aberto
       onFechar={onFechar}
-      titulo={`Alterar transportadora · Pedido ${pedido.numeroFormatado}`}
-      descricao="Atualize a transportadora e as observações deste pedido."
+      tamanho="lg"
+      titulo={`${pedido.transportadoraNome ? "Alterar" : "Escolher"} transportadora · Pedido ${pedido.numeroFormatado}`}
+      descricao={`Transportadoras que atendem ${pedido.cidade ? `${pedido.cidade}/` : ""}${pedido.estado || "o endereço do cliente"}. Nº da cotação e contato são opcionais.`}
       rodape={
         <>
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button onClick={salvar}>Salvar</Button>
+          <Button loading={salvando} onClick={salvar}>
+            Salvar
+          </Button>
         </>
       }
     >
-      <div className="space-y-4">
-        <Field label="Transportadora">
-          <Select value={id} onChange={(e) => setId(e.target.value)}>
-            <option value="">Sem transportadora</option>
-            {lista.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nome}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Observações da transportadora neste pedido">
-          <Textarea value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: coleta combinada, janela de retirada, restrições de entrega" />
-        </Field>
-      </div>
+      <SeletorTransportadora
+        uf={pedido.estado}
+        cidade={pedido.cidade}
+        pesoGramas={pedido.pesoTotalGramas}
+        selecionada={selecionada}
+        onSelecionar={setSelecionada}
+        observacao={obs}
+        onObservacao={setObs}
+        cotacao={cotacao}
+        onCotacao={setCotacao}
+      />
     </Dialog>
   );
 }

@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Globe, Search, Sparkles, Truck } from "lucide-react";
 import api, { mensagemErro } from "../../services/api";
-import { Badge, Button, Field, Skeleton, Textarea, cx, useToast } from "../ui";
+import { Badge, Button, Field, Input, Skeleton, Textarea, cx, useToast } from "../ui";
 import { BotaoWhatsapp } from "../Whatsapp";
 import { UFS, numero } from "../../utils/format";
 
 // Equipe escolhendo "Transportadora" no checkout: sugere as que atendem a UF
 // do cliente (planilha interna + Parceiros + já usadas para o estado) e
 // permite buscar na web com IA, como na aba Comercial → Transportadoras.
-export default function SeletorTransportadora({ uf, cidade, pesoGramas, selecionada, onSelecionar, observacao, onObservacao }) {
+// cotacao = { numero, com } — opcionais, ficam junto da transportadora no pedido.
+export default function SeletorTransportadora({ uf, cidade, pesoGramas, selecionada, onSelecionar, observacao, onObservacao, cotacao, onCotacao }) {
   const toast = useToast();
   const [dados, setDados] = useState(null);
   const [filtro, setFiltro] = useState("");
@@ -150,8 +151,18 @@ export default function SeletorTransportadora({ uf, cidade, pesoGramas, selecion
               Chamar no WhatsApp
             </BotaoWhatsapp>
           )}
+          {onCotacao && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Nº da cotação (opcional)">
+                <Input value={cotacao?.numero || ""} maxLength={60} onChange={(e) => onCotacao({ ...cotacao, numero: e.target.value })} placeholder="Ex.: 458712" />
+              </Field>
+              <Field label="Cotação feita com (opcional)">
+                <Input value={cotacao?.com || ""} maxLength={150} onChange={(e) => onCotacao({ ...cotacao, com: e.target.value })} placeholder="Nome de quem passou a cotação" />
+              </Field>
+            </div>
+          )}
           <Field label="Observações para a transportadora (aparecem na expedição)">
-            <Textarea rows={2} value={observacao} onChange={(e) => onObservacao(e.target.value)} placeholder="Ex.: coleta combinada para quinta, cotação nº 123, falar com Fulano" />
+            <Textarea rows={2} value={observacao} onChange={(e) => onObservacao(e.target.value)} placeholder="Ex.: coleta combinada para quinta" />
           </Field>
         </div>
       )}

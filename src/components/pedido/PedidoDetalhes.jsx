@@ -122,6 +122,8 @@ export default function PedidoDetalhes({ pedidoId, onFechar }) {
                   <>
                     <Info rotulo="Nome">{pedido.transportadoraNome}</Info>
                     {pedido.transportadora?.telefone && <Info rotulo="Telefone">{pedido.transportadora.telefone}</Info>}
+                    {pedido.transportadoraCotacao && <Info rotulo="Nº da cotação">{pedido.transportadoraCotacao}</Info>}
+                    {pedido.transportadoraCotacaoCom && <Info rotulo="Cotação feita com">{pedido.transportadoraCotacaoCom}</Info>}
                     {pedido.transportadoraObs && <Info rotulo="Observações">{pedido.transportadoraObs}</Info>}
                   </>
                 ) : (

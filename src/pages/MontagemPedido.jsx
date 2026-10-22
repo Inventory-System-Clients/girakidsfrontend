@@ -143,6 +143,8 @@ export default function MontagemPedido() {
           <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Transportadora e documentos</p>
           <Linha rotulo="Transportadora">{pedido.transportadoraNome || "Nenhuma vinculada"}</Linha>
           <Linha rotulo="Telefone transportadora">{pedido.transportadora?.telefone}</Linha>
+          <Linha rotulo="Nº da cotação">{pedido.transportadoraCotacao}</Linha>
+          <Linha rotulo="Cotação feita com">{pedido.transportadoraCotacaoCom}</Linha>
           <Linha rotulo="Obs. transportadora">{pedido.transportadoraObs}</Linha>
           {pedido.transportadora?.telefone && (
             <BotaoWhatsapp variante="contorno" className="py-1 text-xs" telefone={pedido.transportadora.telefone} texto={`Olá! Aqui é da Gira Kids, sobre a coleta do pedido ${pedido.numeroFormatado}.`}>

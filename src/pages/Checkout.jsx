@@ -171,6 +171,7 @@ export default function Checkout({ modo = "pedido" }) {
   const [mostrarIA, setMostrarIA] = useState(false);
   const [transportadora, setTransportadora] = useState(null);
   const [transportadoraObs, setTransportadoraObs] = useState("");
+  const [cotacao, setCotacao] = useState({ numero: "", com: "" });
 
   const escolherCliente = (u) => {
     setClienteSelecionado(u);
@@ -260,6 +261,8 @@ export default function Checkout({ modo = "pedido" }) {
             ? { id: transportadora.id, nome: transportadora.nome, telefone: transportadora.whatsapp || transportadora.telefone, cidade: transportadora.cidadeBase, observacao: transportadora.observacao }
             : null,
         transportadoraObs: metodoEnvio === "TRANSPORTADORA" ? transportadoraObs : null,
+        transportadoraCotacao: metodoEnvio === "TRANSPORTADORA" ? cotacao.numero : null,
+        transportadoraCotacaoCom: metodoEnvio === "TRANSPORTADORA" ? cotacao.com : null,
         observacoes,
       };
       // Cliente novo: a conta é criada com os dados do pedido (senha padrão).
@@ -542,6 +545,8 @@ export default function Checkout({ modo = "pedido" }) {
                   onSelecionar={setTransportadora}
                   observacao={transportadoraObs}
                   onObservacao={setTransportadoraObs}
+                  cotacao={cotacao}
+                  onCotacao={setCotacao}
                 />
               </div>
             )}
