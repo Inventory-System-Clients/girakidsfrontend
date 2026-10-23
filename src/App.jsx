@@ -92,7 +92,7 @@ export default function App() {
                   <Route path="/expedicao" element={<Protegida permissoes={["EXPEDICAO"]}><Expedicao /></Protegida>} />
                   <Route path="/expedicao/:id" element={<Protegida permissoes={["EXPEDICAO"]}><MontagemPedido /></Protegida>} />
                   <Route path="/produtos" element={<Protegida permissoes={["PRODUTOS"]}><Produtos /></Protegida>} />
-                  <Route path="/entradas" element={<Protegida permissoes={["ENTRADAS"]}><Entradas /></Protegida>} />
+                  <Route path="/entradas" element={<Protegida permissoes={["ENTRADAS", "RECEBIMENTOS"]}><Entradas /></Protegida>} />
                   <Route path="/recebimentos" element={<Protegida permissoes={["RECEBIMENTOS"]}><Recebimentos /></Protegida>} />
                   <Route path="/fornecedor" element={<FornecedorRecebimento />} />
                   <Route path="/pagamentos" element={<Protegida permissoes={["SOMENTE_ADMIN"]}><PagamentosConfig /></Protegida>} />

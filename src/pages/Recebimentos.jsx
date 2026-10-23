@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, BellRing, Clock, PackageCheck, PackagePlus, Search, ShoppingCart, Truck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertTriangle, BellRing, ClipboardList, Clock, PackageCheck, PackagePlus, Search, ShoppingCart, Truck } from "lucide-react";
 import api from "../services/api";
 import { Button, Card, EmptyState, PageHeader, Segmented, Skeleton, Table, Tabs, Td, Th, cx } from "../components/ui";
 import { data, dataHora } from "../utils/format";
@@ -182,6 +183,7 @@ export default function Recebimentos() {
   const [form, setForm] = useState(null);
   const [aberto, setAberto] = useState(null);
   const alertas = useAlertasRecebimentos(true);
+  const navigate = useNavigate();
 
   const carregarLista = useCallback(() => {
     api.get("/recebimentos", { params: { ...FILTROS[filtro].params, busca: busca || undefined } }).then(({ data: d }) => setLista(d));
@@ -216,6 +218,9 @@ export default function Recebimentos() {
   return (
     <div className="container-app py-6">
       <PageHeader titulo="Recebimentos" subtitulo="Compras de brinquedos, cápsulas e produtos: pré-recebimento com link para o fornecedor, conferência na chegada e montagem em cápsula.">
+        <Button variant="outline" onClick={() => navigate("/entradas")}>
+          <ClipboardList className="h-4 w-4" /> Resumo entradas
+        </Button>
         <Button variant="success" onClick={() => setForm({ direto: true })}>
           <PackageCheck className="h-4 w-4" /> Receber agora
         </Button>

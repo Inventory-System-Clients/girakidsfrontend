@@ -10,7 +10,7 @@ export const TELAS = {
   VENDAS: { label: "Time de Vendas", rota: "/historico-pedidos", descricao: "Permite consultar pedidos e operar o histórico administrativo." },
   EXPEDICAO: { label: "Time Expedição", rota: "/expedicao", descricao: "Permite acompanhar a separação, a montagem e a expedição dos pedidos." },
   PRODUTOS: { label: "Gerenciar Produtos", rota: "/produtos", descricao: "Permite consultar e operar a gestão de produtos e estoque." },
-  ENTRADAS: { label: "Entradas", rota: "/entradas", descricao: "Permite acessar fornecedores, recebimentos e histórico de custos." },
+  ENTRADAS: { label: "Entradas", rota: "/entradas", descricao: "Resumo de entradas: fornecedores, entregas e histórico de custos (abre também pela aba Recebimentos)." },
   ORCAMENTOS: { label: "Orçamentos", rota: "/orcamentos", descricao: "Permite gerar orçamentos usando o fluxo administrativo dedicado." },
   USUARIOS: { label: "Gerenciar Usuários", rota: "/usuarios", descricao: "Permite acessar a gestão de usuários dentro do escopo delegado." },
   COMERCIAL: { label: "Comercial", rota: "/comercial/correios", descricao: "Transportadoras, calculadora de pedidos, notas fiscais e Correios." },

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Eye, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Eye, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import api, { mensagemErro } from "../services/api";
 import {
   Badge,
@@ -470,6 +471,7 @@ function Parceiros({ lista, recarregar }) {
 
 export default function Entradas() {
   const [aba, setAba] = useState("resumo");
+  const navigate = useNavigate();
   const [resumo, setResumo] = useState(null);
   const [parceiros, setParceiros] = useState([]);
   const carregarParceiros = () => api.get("/parceiros").then(({ data: d }) => setParceiros(d));
@@ -481,7 +483,11 @@ export default function Entradas() {
 
   return (
     <div className="container-app py-6">
-      <PageHeader titulo="Entradas e parceiros" subtitulo="Controle entregas por fornecedor, custo de reposição e histórico de custos." />
+      <PageHeader titulo="Resumo de entradas" subtitulo="Controle entregas por fornecedor, custo de reposição e histórico de custos." voltar={false}>
+        <Button variant="ghost" onClick={() => navigate("/recebimentos")}>
+          <ArrowLeft className="h-4 w-4" /> Voltar a Recebimentos
+        </Button>
+      </PageHeader>
       <Tabs className="mb-4" abas={[{ value: "resumo", label: "Resumo" }, { value: "recebimentos", label: "Recebimentos" }, { value: "parceiros", label: "Parceiros" }]} ativa={aba} onChange={setAba} />
       {aba === "resumo" && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

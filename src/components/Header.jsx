@@ -40,7 +40,6 @@ function grupos(pode, usuario, alertasRecebimentos) {
       itens: [
         pode("PRODUTOS") && { label: "Gerenciar Produtos", rota: "/produtos" },
         pode("RECEBIMENTOS") && { label: "Recebimentos", rota: "/recebimentos", contador: alertasRecebimentos },
-        pode("ENTRADAS") && { label: "Entradas", rota: "/entradas" },
         pode("ORCAMENTOS") && { label: "Orçamentos", rota: "/orcamentos" },
         pode("PRODUTOS", "COMERCIAL") && { label: "Banners do catálogo", rota: "/banners" },
       ],
