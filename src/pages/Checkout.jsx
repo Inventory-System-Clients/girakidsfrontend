@@ -234,6 +234,21 @@ export default function Checkout({ modo = "pedido" }) {
   const creditoUsado = usarCredito ? Math.min(creditoDisponivel, subtotal - descontoNum) : 0;
   const base = Math.max(0, subtotal - descontoNum - creditoUsado) + valorFrete + adicionalNum;
   const config = opcoes?.formas?.find((f) => f.codigo === forma);
+  // Maquininha integrada (SumUp, Stone ou Point): a equipe escolhe qual e o
+  // pedido vai direto para a tela dela ao finalizar.
+  const maquininhaIntegrada = interno && !orcamento && forma === "MAQUININHA" && opcoes?.pagamentosOnline?.maquininha?.habilitado;
+  const [maquininhas, setMaquininhas] = useState(null);
+  const [maquininhaId, setMaquininhaId] = useState("");
+  useEffect(() => {
+    if (!maquininhaIntegrada || maquininhas) return;
+    api
+      .get("/pagamentos/maquininhas")
+      .then(({ data }) => {
+        setMaquininhas(data);
+        if (data.length === 1) setMaquininhaId(data[0].id);
+      })
+      .catch(() => setMaquininhas([]));
+  }, [maquininhaIntegrada, maquininhas]);
   const percentual = config?.cartao ? (opcoes?.taxasCartao || TAXAS_CARTAO)[parcelas] || 0 : config?.taxa || 0;
   const taxas = Math.round(base * percentual) / 100;
   const total = base + taxas;
@@ -243,6 +258,7 @@ export default function Checkout({ modo = "pedido" }) {
     if (!orcamento && !metodoEnvio) return toast({ titulo: "Selecione uma opção de entrega", tipo: "aviso" });
     if (!orcamento && !forma) return toast({ titulo: "Selecione a forma de pagamento", tipo: "aviso" });
     if (!cliente.nome) return toast({ titulo: "Campos obrigatórios", descricao: "Preencha os dados do cliente.", tipo: "aviso" });
+    if (maquininhaIntegrada && maquininhas?.length && !maquininhaId) return toast({ titulo: "Escolha a maquininha", descricao: "O pedido vai para a tela dela ao finalizar.", tipo: "aviso" });
     setEnviando(true);
     try {
       const corpo = {
@@ -286,6 +302,15 @@ export default function Checkout({ modo = "pedido" }) {
       } else {
         const { data } = await api.post("/pedidos", corpo);
         if (interno) avisarCadastro(data);
+        // Envia a cobrança para a maquininha escolhida.
+        if (maquininhaIntegrada && maquininhaId) {
+          try {
+            await api.post(`/pagamentos/pedidos/${data.id}/maquininha`, { maquininhaId });
+            toast({ titulo: "Cobrança enviada para a maquininha", descricao: "Peça para o cliente pagar nela; o pedido é confirmado sozinho." });
+          } catch (error) {
+            toast({ titulo: "Pedido salvo, mas a maquininha não recebeu", descricao: `${mensagemErro(error)} Envie de novo pela tela do pedido.`, tipo: "aviso" });
+          }
+        }
         limpar();
         if (interno) escolherCliente(null);
         if (usarCredito) api.get("/auth/perfil").then(({ data: u }) => atualizarUsuario(u)).catch(() => {});
@@ -596,6 +621,26 @@ export default function Checkout({ modo = "pedido" }) {
               })}
             </div>
             {config?.aviso && <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm font-medium text-blue-900">{config.aviso}</p>}
+            {maquininhaIntegrada && (
+              <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-3">
+                {!maquininhas ? (
+                  <p className="text-sm text-blue-900">Carregando maquininhas...</p>
+                ) : !maquininhas.length ? (
+                  <p className="text-sm text-blue-900">Nenhuma maquininha ativa cadastrada em Pagamentos (bancos). O pedido fica como maquininha sem integração.</p>
+                ) : (
+                  <Field label={`Enviar para a maquininha (${opcoes.pagamentosOnline.maquininha.provedorRotulo})`} dica="Ao finalizar, a cobrança aparece na tela da maquininha e o pedido é confirmado sozinho quando o cliente pagar.">
+                    <Select value={maquininhaId} onChange={(e) => setMaquininhaId(e.target.value)}>
+                      <option value="">Selecione</option>
+                      {maquininhas.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nome}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+              </div>
+            )}
             {opcoes && !opcoes.pagamentosOnline?.habilitado && (
               <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">Pagamentos online (PIX QR Code e cartão) estão desabilitados no momento. Use outra forma ou fale com o time de vendas.</p>
             )}

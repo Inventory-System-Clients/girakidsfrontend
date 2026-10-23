@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CheckCircle2, Clock, CreditCard, FileDown, RefreshCw } from "lucide-react";
+import { CheckCircle2, Clock, CreditCard, FileDown, RefreshCw, Smartphone } from "lucide-react";
 import QRCode from "qrcode";
 import api, { mensagemErro } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -23,6 +23,8 @@ export default function Pagamento() {
   const [gerando, setGerando] = useState(false);
   const whatsappComercial = useWhatsappComercial();
   const online = pedido && ["PIX_ONLINE", "CREDITO_ONLINE", "DEBITO_ONLINE"].includes(pedido.formaPagamento);
+  // Cobrança aberta numa maquininha (SumUp/Stone/Point).
+  const naMaquininha = pedido && pedido.statusFinanceiro !== "PAGO" && /^(point|reader|stone):/.test(pedido.pagamentoReferencia || "");
 
   const consultar = useCallback(async () => {
     setAtualizando(true);
@@ -41,10 +43,20 @@ export default function Pagamento() {
   }, [id]);
 
   useEffect(() => {
-    if (!online || pedido?.statusFinanceiro === "PAGO" || !pedido?.pagamentoReferencia) return undefined;
-    const t = setInterval(consultar, 8000);
+    if (!(online || naMaquininha) || pedido?.statusFinanceiro === "PAGO" || !pedido?.pagamentoReferencia) return undefined;
+    const t = setInterval(consultar, naMaquininha ? 4000 : 8000);
     return () => clearInterval(t);
-  }, [online, pedido?.statusFinanceiro, pedido?.pagamentoReferencia, consultar]);
+  }, [online, naMaquininha, pedido?.statusFinanceiro, pedido?.pagamentoReferencia, consultar]);
+
+  const cancelarMaquininha = async () => {
+    try {
+      const { data } = await api.post(`/pagamentos/pedidos/${id}/maquininha/cancelar`);
+      setPedido(data);
+      toast({ titulo: "Cobrança retirada da maquininha" });
+    } catch (error) {
+      toast({ titulo: "Erro", descricao: mensagemErro(error), tipo: "erro" });
+    }
+  };
 
   // QR Code desenhado no navegador a partir do PIX copia e cola.
   useEffect(() => {
@@ -79,6 +91,18 @@ export default function Pagamento() {
         <p className="mt-1 text-muted-foreground">
           Pedido <strong>{pedido.numeroFormatado}</strong> · {moeda(pedido.total)} · {nomeForma(pedido.formaPagamento)}
         </p>
+        {naMaquininha && (
+          <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <Smartphone className="mx-auto h-10 w-10 animate-pulse text-blue-600" />
+            <p className="mt-2 font-semibold text-blue-900">Aguardando o pagamento na maquininha...</p>
+            <p className="text-sm text-blue-900">Assim que o cliente pagar, o pedido é confirmado e liberado sozinho.</p>
+            {interno && (
+              <Button variant="danger-outline" size="sm" className="mt-3" onClick={cancelarMaquininha}>
+                Cancelar cobrança na maquininha
+              </Button>
+            )}
+          </div>
+        )}
         {!pago && online && pedido.pagamentoQrCode && (
           <div className="mt-6">
             <p className="mb-2 text-sm font-medium">Pague com o PIX abaixo (QR Code ou copia e cola):</p>
@@ -112,7 +136,7 @@ export default function Pagamento() {
         <p className="mt-6 text-sm text-muted-foreground">
           {pago
             ? "Seu pagamento foi recebido. O pedido segue para montagem e envio."
-            : online && pedido.pagamentoReferencia
+            : (online || naMaquininha) && pedido.pagamentoReferencia
               ? "Atualizando automaticamente o status do pedido."
               : FORMAS_PAGAMENTO[pedido.formaPagamento]
                 ? "Nosso time entrará em contato para confirmar os dados."
@@ -128,7 +152,7 @@ export default function Pagamento() {
               Falar com o comercial no WhatsApp
             </BotaoWhatsapp>
           )}
-          {!pago && online && pedido.pagamentoReferencia && (
+          {!pago && (online || naMaquininha) && pedido.pagamentoReferencia && (
             <Button variant="outline" loading={atualizando} onClick={consultar}>
               <RefreshCw className="h-4 w-4" /> Atualizar status
             </Button>
