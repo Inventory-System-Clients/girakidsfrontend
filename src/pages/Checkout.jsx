@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Copy, Download, FileDown, Package, Plus, ShoppingCart, Sparkles, Trash2, Truck, Wallet } from "lucide-react";
 import api, { mensagemErro } from "../services/api";
@@ -26,7 +26,8 @@ import ClienteBusca from "../components/ClienteBusca";
 import { ClienteSelecionado, HistoricoCliente, MontarComIA } from "../components/checkout/Assistente";
 import { lerEscolhasGiraldo } from "../components/Giraldo";
 import SeletorTransportadora from "../components/checkout/SeletorTransportadora";
-import { hojeISO, lerNumero, moeda, moedaUnitaria, somenteDigitos } from "../utils/format";
+import { buscarCep, hojeISO, lerNumero, moeda, moedaUnitaria, somenteDigitos } from "../utils/format";
+import { ouvirComandosGiraldo, publicarCheckout } from "../utils/giraldoPonte";
 import { FORMAS_PAGAMENTO } from "../utils/status";
 import { gerarPdfPedido } from "../utils/pdf";
 
@@ -322,6 +323,51 @@ export default function Checkout({ modo = "pedido" }) {
       setEnviando(false);
     }
   };
+
+  // --- Giraldo: o assistente vê o carrinho e preenche a tela ao vivo ---
+  const enviarRef = useRef(null);
+  useEffect(() => {
+    enviarRef.current = enviar;
+  });
+  const CAMPOS_OBRIGATORIOS = { nome: "nome", telefone: "telefone", documento: "CPF/CNPJ", cep: "CEP", rua: "rua", numero: "número", cidade: "cidade", estado: "estado" };
+  const faltando = Object.entries(CAMPOS_OBRIGATORIOS)
+    .filter(([campo]) => !String(cliente[campo] || "").trim())
+    .map(([, rotulo]) => rotulo);
+  useEffect(() => {
+    if (interno || orcamento) return;
+    publicarCheckout({
+      metodoEnvio: metodoEnvio || null,
+      formaPagamento: forma || null,
+      parcelas: config?.cartao ? parcelas : null,
+      cep: somenteDigitos(cliente.cep) || null,
+      opcoesEntrega: (frete?.opcoes || []).map((o) => ({ metodo: o.metodo, disponivel: o.disponivel, valor: o.valor, prazoDias: o.prazoDias })),
+      formasDisponiveis: (opcoes?.formas || []).filter((f) => f.disponivel !== false).map((f) => ({ codigo: f.codigo, nome: f.nome, somenteEnvios: f.somenteEnvios || null })),
+      subtotal,
+      frete: valorFrete,
+      total,
+      dadosFaltando: faltando,
+      observacoes,
+    });
+  });
+  useEffect(() => {
+    if (interno || orcamento) return undefined;
+    return ouvirComandosGiraldo(async (c) => {
+      if (c.tipo === "entrega") setMetodoEnvio(c.metodoEnvio);
+      else if (c.tipo === "pagamento") setForma(c.formaPagamento);
+      else if (c.tipo === "parcelas") setParcelas(Math.min(12, Math.max(1, Number(c.parcelas) || 1)));
+      else if (c.tipo === "observacao") setObservacoes(String(c.texto || "").slice(0, 500));
+      else if (c.tipo === "dados") setCliente((atual) => ({ ...atual, [c.campo]: c.valor }));
+      else if (c.tipo === "cep") {
+        const cep = somenteDigitos(c.cep);
+        setCliente((atual) => ({ ...atual, cep }));
+        const endereco = await buscarCep(cep);
+        if (endereco) setCliente((atual) => ({ ...atual, cep, rua: endereco.rua || atual.rua, bairro: endereco.bairro || atual.bairro, cidade: endereco.cidade || atual.cidade, estado: endereco.estado || atual.estado }));
+      } else if (c.tipo === "finalizar") {
+        // Dá tempo das escolhas acima entrarem na tela antes de finalizar.
+        setTimeout(() => enviarRef.current?.(), 300);
+      }
+    });
+  }, [interno, orcamento]);
 
   if (orcamentoGerado) {
     return (

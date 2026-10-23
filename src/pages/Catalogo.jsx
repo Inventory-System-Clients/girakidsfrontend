@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Link2, Maximize2, Package, PlayCircle, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
 import api from "../services/api";
 import Carrossel from "../components/Carrossel";
@@ -87,7 +87,18 @@ export default function Catalogo() {
   const [ampliada, setAmpliada] = useState(null);
   const layoutBanner = useLayoutBanner();
   const { produtoId } = useParams();
+  const [parametros] = useSearchParams();
   const toast = useToast();
+
+  // /?categoria=... ou /?busca=... (o Giraldo abre o catálogo assim).
+  const categoriaUrl = parametros.get("categoria");
+  const buscaUrl = parametros.get("busca");
+  useEffect(() => {
+    if (categoriaUrl == null && buscaUrl == null) return;
+    setCategoria(categoriaUrl || "");
+    setBusca(buscaUrl || "");
+    setPagina(1);
+  }, [categoriaUrl, buscaUrl]);
 
   // Link do produto (/produto/:id) abre o catálogo já com o item ampliado.
   useEffect(() => {

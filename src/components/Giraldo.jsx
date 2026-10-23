@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2, Mic, Minus, Package, Plus, Send, ShoppingCart, Square, X } from "lucide-react";
 import api, { mensagemErro } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -8,6 +8,7 @@ import { useCart } from "../contexts/CartContext";
 import { cx } from "./ui";
 import { BotaoWhatsapp } from "./Whatsapp";
 import { moeda, moedaUnitaria } from "../utils/format";
+import { lerCheckout, pedirAoCheckout } from "../utils/giraldoPonte";
 
 const CHAVE_CONVERSA = "girakids_giraldo_conversa";
 const CHAVE_ESTADO = "girakids_giraldo_estado";
@@ -191,6 +192,7 @@ export default function Giraldo() {
   const { usuario } = useAuth();
   const cart = useCart();
   const navigate = useNavigate();
+  const local = useLocation();
   const [aberto, setAberto] = useState(() => ler(CHAVE_ABERTO, false));
   const [mensagens, setMensagens] = useState(() => ler(CHAVE_CONVERSA, [BOAS_VINDAS]));
   const [estado, setEstado] = useState(() => ler(CHAVE_ESTADO, {}));
@@ -200,6 +202,12 @@ export default function Giraldo() {
   // tempos em tempos. Fechado no X, fica fechado até recarregar a página
   // (estado só em memória).
   const [balao, setBalao] = useState(false);
+  const noCarrinho = local.pathname === "/checkout";
+  const textoBalao = noCarrinho && cart.itens.length ? "Quer ajuda para finalizar? Eu escolho a entrega e o pagamento com você 😊" : "Posso te ajudar com a sua compra? 😊";
+  // Finalização pedida pelo Giraldo: ao cair na tela do pedido, ele avisa.
+  const finalizandoRef = useRef(false);
+  // Mudança de tela feita pelo próprio Giraldo (ele já explicou na resposta).
+  const navegouRef = useRef(false);
   const [balaoDispensado, setBalaoDispensado] = useState(false);
   const jaApareceu = useRef(false);
   const [whatsapp, setWhatsapp] = useState("5511942058445");
@@ -240,37 +248,15 @@ export default function Giraldo() {
 
   const adicionarMensagem = (m) => setMensagens((lista) => [...lista, m]);
 
-  const finalizarPedido = async (estadoAtual) => {
-    const itens = carrinhoRef.current;
-    if (!itens.length) return adicionarMensagem({ role: "assistant", content: "Seu carrinho está vazio. O que você gostaria de comprar?" });
-    if (!usuario) return adicionarMensagem({ role: "assistant", content: "Para finalizar, entre na sua conta ou crie uma rapidinho. Seu carrinho fica guardado 😉", login: true });
-    try {
-      const { data } = await api.post("/pedidos", {
-        itens: itens.map((i) => ({ produtoId: i.produto.id, quantidade: i.quantidade })),
-        metodoEnvio: estadoAtual.metodoEnvio,
-        formaPagamento: estadoAtual.formaPagamento || "A_DEFINIR",
-        observacoes: "Pedido feito com o assistente Giraldo",
-      });
-      cart.limpar();
-      setEstado({});
-      adicionarMensagem({
-        role: "assistant",
-        content: `Pronto! 🎉 Seu pedido nº ${data.numeroFormatado} foi criado (${moeda(data.total)}). Vou te levar para a tela do pedido.`,
-        sugestoes: ["Quero comprar mais"],
-      });
-      navigate(`/pagamento/${data.id}`);
-    } catch (error) {
-      adicionarMensagem({
-        role: "assistant",
-        content: `Não consegui finalizar: ${mensagemErro(error)}. Vou abrir a tela de finalizar pedido para você completar os dados.`,
-      });
-      navigate("/checkout");
-    }
-  };
-
+  // Ações que o Giraldo manda: carrinho, escolhas na tela do carrinho
+  // (aplicadas ao vivo pela ponte com o checkout) e navegação.
   const executarAcoes = async (acoes = [], estadoBase) => {
     let novoEstado = { ...estadoBase };
-    let finalizar = false;
+    const irPara = (rota) => {
+      if (window.location.pathname + window.location.search === rota) return;
+      navegouRef.current = true;
+      navigate(rota);
+    };
     for (const a of acoes) {
       if (a.tipo === "adicionar_carrinho" && a.produto) {
         const atual = carrinhoRef.current.find((i) => i.produto.id === a.produto.id)?.quantidade || 0;
@@ -281,20 +267,72 @@ export default function Giraldo() {
         cart.definirQuantidade(a.produto, 0);
       } else if (a.tipo === "definir_entrega") {
         novoEstado = { ...novoEstado, metodoEnvio: a.metodoEnvio };
+        pedirAoCheckout({ tipo: "entrega", metodoEnvio: a.metodoEnvio });
       } else if (a.tipo === "definir_pagamento") {
         novoEstado = { ...novoEstado, formaPagamento: a.formaPagamento };
+        pedirAoCheckout({ tipo: "pagamento", formaPagamento: a.formaPagamento });
       } else if (a.tipo === "definir_cep") {
         novoEstado = { ...novoEstado, cep: a.cep };
+        pedirAoCheckout({ tipo: "cep", cep: a.cep });
+      } else if (a.tipo === "definir_parcelas") {
+        pedirAoCheckout({ tipo: "parcelas", parcelas: a.parcelas });
+      } else if (a.tipo === "definir_observacao") {
+        pedirAoCheckout({ tipo: "observacao", texto: a.texto });
+      } else if (a.tipo === "preencher_dados") {
+        pedirAoCheckout({ tipo: "dados", campo: a.campo, valor: a.valor });
       } else if (a.tipo === "abrir_carrinho" || a.tipo === "ir_checkout") {
-        navigate("/checkout");
+        irPara("/checkout");
+      } else if (a.tipo === "navegar" && a.rota) {
+        irPara(a.rota);
+      } else if (a.tipo === "mostrar_catalogo") {
+        irPara(a.categoria ? `/?categoria=${encodeURIComponent(a.categoria)}` : `/?busca=${encodeURIComponent(a.busca || "")}`);
+      } else if (a.tipo === "abrir_produto" && a.produtoId) {
+        irPara(`/produto/${a.produtoId}`);
       } else if (a.tipo === "finalizar_pedido") {
-        finalizar = true;
+        if (!usuario) {
+          adicionarMensagem({ role: "assistant", content: "Para finalizar, entre na sua conta ou crie uma rapidinho. Seu carrinho fica guardado 😉", login: true });
+          continue;
+        }
+        // Finaliza pela tela do carrinho (mesmas conferências do botão).
+        finalizandoRef.current = true;
+        irPara("/checkout");
+        pedirAoCheckout({ tipo: "finalizar" });
       }
     }
     setEstado(novoEstado);
-    // Espera o carrinho atualizar antes de criar o pedido.
-    if (finalizar) setTimeout(() => finalizarPedido(novoEstado), 50);
   };
+
+  // Mudou de tela: no carrinho o Giraldo se oferece para ajudar; depois de
+  // finalizar, avisa que o pedido foi criado.
+  const paginaAnterior = useRef(local.pathname);
+  useEffect(() => {
+    const anterior = paginaAnterior.current;
+    paginaAnterior.current = local.pathname;
+    if (anterior === local.pathname) return;
+    if (local.pathname.startsWith("/pagamento/") && finalizandoRef.current) {
+      finalizandoRef.current = false;
+      setEstado({});
+      setMensagens((lista) => [...lista, { role: "assistant", content: "Pronto! 🎉 Seu pedido foi criado. Aqui embaixo estão os dados para pagamento. Posso ajudar em mais alguma coisa?", sugestoes: ["Quero comprar mais", "Ver meus pedidos"] }]);
+      return;
+    }
+    if (navegouRef.current) {
+      navegouRef.current = false;
+      return;
+    }
+    if (local.pathname === "/checkout" && carrinhoRef.current.length) {
+      if (!aberto) {
+        if (!balaoDispensado) setBalao(true);
+        return;
+      }
+      setMensagens((lista) => {
+        const ultima = lista[lista.length - 1];
+        if (ultima?.role === "assistant" && ultima.noCarrinho) return lista;
+        const tela = lerCheckout();
+        const sugestoes = !tela?.metodoEnvio ? ["Retirar na loja", "Correios (PAC/SEDEX)", "Transportadora"] : !tela?.formaPagamento ? ["PIX", "Cartão de crédito", "Combinar com o comercial"] : ["Pode finalizar", "Mudar a entrega"];
+        return [...lista, { role: "assistant", content: "Estamos no seu carrinho 🛒 Eu posso escolher a entrega, o pagamento e preencher os dados com você. Como você quer receber?", sugestoes, noCarrinho: true }];
+      });
+    }
+  }, [local.pathname, aberto, balaoDispensado]);
 
   const enviar = async (conteudo) => {
     const mensagem = String(conteudo ?? texto).trim();
@@ -308,6 +346,8 @@ export default function Giraldo() {
         mensagens: historico.map(({ role, content }) => ({ role, content })),
         carrinho: carrinhoRef.current.map((i) => ({ produtoId: i.produto.id, quantidade: i.quantidade })),
         estado,
+        pagina: window.location.pathname + window.location.search,
+        checkout: lerCheckout(),
       });
       if (data.whatsappComercial) setWhatsapp(data.whatsappComercial);
       adicionarMensagem({
@@ -358,7 +398,7 @@ export default function Giraldo() {
               <button type="button" className="absolute -top-2 -right-2 rounded-full bg-white p-0.5 shadow" onClick={() => setBalaoDispensado(true)} aria-label="Fechar aviso">
                 <X className="h-3 w-3" />
               </button>
-              <strong className="text-blue-700">Olá! Eu sou o Giraldo.</strong> Posso te ajudar com a sua compra? 😊
+              <strong className="text-blue-700">Olá! Eu sou o Giraldo.</strong> {textoBalao}
             </div>
           )}
           <button
@@ -402,7 +442,7 @@ export default function Giraldo() {
               <Mensagem
                 key={i}
                 m={i === mensagens.length - 1 ? m : { ...m, sugestoes: [], login: false }}
-                onSugestao={(s) => (s === "Ver meu carrinho" ? navigate("/checkout") : enviar(s))}
+                onSugestao={(s) => (s === "Ver meu carrinho" ? navigate("/checkout") : s === "Ver meus pedidos" && usuario ? navigate("/meus-pedidos") : enviar(s))}
                 onAdicionar={adicionarManual}
                 onLogin={irPara}
                 whatsapp={whatsapp}
@@ -462,7 +502,9 @@ export default function Giraldo() {
                 </button>
               </form>
             )}
-            <p className="mt-1.5 text-center text-[10px] text-muted-foreground">O Giraldo usa IA e pode errar — confira o carrinho antes de finalizar.</p>
+            <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
+              {noCarrinho ? "O Giraldo preenche a tela do carrinho para você — confira antes de finalizar." : "O Giraldo usa IA e pode errar — confira o carrinho antes de finalizar."}
+            </p>
           </footer>
         </section>
       )}
