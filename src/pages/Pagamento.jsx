@@ -104,6 +104,11 @@ export default function Pagamento() {
             </Button>
           </div>
         )}
+        {!pago && pedido.formaPagamento === "CREDITO_LINK" && !interno && (
+          <p className="mt-6 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
+            Para pagar no cartão, fale com o comercial no WhatsApp abaixo: enviamos o link de pagamento do pedido {pedido.numeroFormatado}.
+          </p>
+        )}
         <p className="mt-6 text-sm text-muted-foreground">
           {pago
             ? "Seu pagamento foi recebido. O pedido segue para montagem e envio."

@@ -577,7 +577,9 @@ export default function Checkout({ modo = "pedido" }) {
                     <span className="flex-1">
                       <span className="block text-sm font-medium">{f.nome}</span>
                       <span className="text-xs text-muted-foreground">
-                        {f.combinar
+                        {f.contatoComercial
+                          ? "O comercial envia o link do cartão"
+                          : f.combinar
                           ? f.somenteEnvios
                             ? "Para retirada ou transportadora"
                             : "O comercial envia a forma de pagamento"
@@ -593,6 +595,7 @@ export default function Checkout({ modo = "pedido" }) {
                 );
               })}
             </div>
+            {config?.aviso && <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm font-medium text-blue-900">{config.aviso}</p>}
             {opcoes && !opcoes.pagamentosOnline?.habilitado && (
               <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">Pagamentos online (PIX QR Code e cartão) estão desabilitados no momento. Use outra forma ou fale com o time de vendas.</p>
             )}

@@ -39,19 +39,21 @@ const Logo = ({ nome }) => (
 );
 
 function Canal({ canal, dados, onEscolher, salvando }) {
-  const atual = dados.canais[canal.chave];
+  const escolha = dados.canais[canal.chave];
+  const atual = dados.emUso?.[canal.chave] || null;
+  const automatico = dados.emUso?.[`${canal.chave}Automatico`];
   const opcoes = dados.provedores.filter((p) => p.canais.includes(canal.chave));
   return (
     <Card className="p-5">
       <h2 className="font-semibold">{canal.titulo}</h2>
       <p className="mb-3 text-sm text-muted-foreground">{canal.descricao}</p>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
         {opcoes.map((p) => (
           <button
             key={p.nome}
             type="button"
             disabled={salvando}
-            onClick={() => onEscolher(canal.chave, atual === p.nome ? null : p.nome)}
+            onClick={() => onEscolher(canal.chave, p.nome)}
             className={cx(
               "flex items-start gap-3 rounded-xl border p-3 text-left transition disabled:opacity-60",
               atual === p.nome ? "border-primary bg-primary-soft ring-2 ring-primary/20" : "border-border bg-white hover:border-primary/40",
@@ -61,7 +63,7 @@ function Canal({ canal, dados, onEscolher, salvando }) {
             <span className="min-w-0">
               <span className="flex flex-wrap items-center gap-1.5 font-semibold">
                 {p.rotulo}
-                {atual === p.nome && <Badge variant="primary">Em uso</Badge>}
+                {atual === p.nome && <Badge variant="primary">{automatico ? "Em uso (automático)" : "Em uso"}</Badge>}
                 {p.configurado ? <Badge variant="success">Configurado</Badge> : <Badge variant="warning">Sem credenciais</Badge>}
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">{canal.detalhes[p.nome]}</span>
@@ -72,7 +74,16 @@ function Canal({ canal, dados, onEscolher, salvando }) {
           type="button"
           disabled={salvando}
           onClick={() => onEscolher(canal.chave, null)}
-          className={cx("rounded-xl border p-3 text-left text-sm transition", !atual ? "border-primary bg-primary-soft" : "border-border bg-white hover:border-primary/40")}
+          className={cx("rounded-xl border p-3 text-left text-sm transition", !escolha ? "border-primary bg-primary-soft" : "border-border bg-white hover:border-primary/40")}
+        >
+          <span className="font-semibold">Automático</span>
+          <span className="block text-xs text-muted-foreground">Usa o banco que tiver credenciais (se houver mais de um, o cadastrado primeiro).</span>
+        </button>
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={() => onEscolher(canal.chave, "desligado")}
+          className={cx("rounded-xl border p-3 text-left text-sm transition", escolha === "desligado" ? "border-primary bg-primary-soft" : "border-border bg-white hover:border-primary/40")}
         >
           <span className="font-semibold">Desligado</span>
           <span className="block text-xs text-muted-foreground">{canal.chave === "online" ? "Pedidos online seguem o fluxo manual (financeiro confirma)." : "Maquininha usada sem integração."}</span>
@@ -184,7 +195,7 @@ function Credenciais({ provedor, onSalvo }) {
 function NovaMaquininha({ dados, onFechar, onSalvo }) {
   const toast = useToast();
   const comMaquininha = dados.provedores.filter((p) => p.canais.includes("maquininha"));
-  const [f, setF] = useState({ nome: "", provedor: dados.canais.maquininha || comMaquininha[0]?.nome, identificador: "", codigo: "", readerId: "" });
+  const [f, setF] = useState({ nome: "", provedor: dados.emUso?.maquininha || comMaquininha.find((p) => p.configurado)?.nome || comMaquininha[0]?.nome, identificador: "", codigo: "", readerId: "" });
   const [readers, setReaders] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const provedor = comMaquininha.find((p) => p.nome === f.provedor);
@@ -333,16 +344,28 @@ export default function Pagamentos() {
   const escolher = async (canal, nome) => {
     const rotulo = dados.provedores.find((p) => p.nome === nome)?.rotulo;
     const ok = await confirmar({
-      titulo: nome ? `Usar ${rotulo} para ${canal === "online" ? "o pagamento online" : "a maquininha"}?` : "Desligar este canal?",
-      mensagem: nome ? "Vale para os próximos pedidos." : canal === "online" ? "PIX online e cartão online somem do checkout; os pedidos seguem pelo fluxo manual." : "A equipe deixa de enviar cobranças para a maquininha pelo sistema.",
-      confirmar: nome ? "Usar" : "Desligar",
+      titulo:
+        nome === "desligado"
+          ? "Desligar este canal?"
+          : nome
+            ? `Usar ${rotulo} para ${canal === "online" ? "o pagamento online" : "a maquininha"}?`
+            : "Escolher o banco automaticamente?",
+      mensagem:
+        nome === "desligado"
+          ? canal === "online"
+            ? "PIX online e cartão online somem do checkout; os pedidos seguem pelo fluxo manual."
+            : "A equipe deixa de enviar cobranças para a maquininha pelo sistema."
+          : nome
+            ? "Vale para os próximos pedidos."
+            : "O sistema usa o banco que tiver credenciais cadastradas.",
+      confirmar: nome === "desligado" ? "Desligar" : "Confirmar",
     });
     if (!ok) return;
     setSalvando(true);
     try {
       const { data } = await api.put("/pagamentos/config/canais", { [canal]: nome });
       setDados(data);
-      toast({ titulo: nome ? `${rotulo} ativo` : "Canal desligado" });
+      toast({ titulo: nome === "desligado" ? "Canal desligado" : nome ? `${rotulo} ativo` : "Escolha automática ligada" });
     } catch (error) {
       toast({ titulo: "Não foi possível trocar", descricao: mensagemErro(error), tipo: "erro" });
     } finally {
@@ -422,7 +445,7 @@ export default function Pagamentos() {
                   <p className="font-medium">{m.nome}</p>
                   <p className="truncate font-mono text-xs text-muted-foreground">{m.identificador}</p>
                 </div>
-                {dados.canais.maquininha !== m.provedor && <Badge variant="warning">Banco não está ativo na maquininha</Badge>}
+                {dados.emUso?.maquininha !== m.provedor && <Badge variant="warning">Banco não está ativo na maquininha</Badge>}
                 <Switch checked={m.ativa !== false} onChange={(v) => atualizarMaq(m, { ativa: v })} />
                 <Button size="icon" variant="ghost" onClick={() => removerMaq(m)} aria-label="Remover">
                   <Trash2 className="h-4 w-4 text-red-600" />
