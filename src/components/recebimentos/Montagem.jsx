@@ -27,7 +27,16 @@ const Num = ({ v, cor, forte }) => <span className={cx(forte && "font-semibold",
 export function ConfigMontagem({ produto, onFechar, onSalvo }) {
   const toast = useToast();
   const [alvo, setAlvo] = useState(produto || null);
-  const [capsulas, setCapsulas] = useState(() => (produto?.capsulas || []).map((c) => ({ ...c })));
+  // Itens de cápsula: todos são necessários; dentro de um item, qualquer
+  // opção serve (ex.: branca OU vermelha).
+  const [grupos, setGrupos] = useState(() =>
+    (produto?.capsulas || []).map((g) => ({ opcoes: (g.opcoes || [g]).map((o) => ({ produtoId: o.produtoId, nome: o.nome, quantidade: String(o.quantidade) })) })),
+  );
+  const usadas = grupos.flatMap((g) => g.opcoes.map((o) => o.produtoId));
+  const setOpcao = (gi, oi, mudanca) => setGrupos((l) => l.map((g, j) => (j === gi ? { opcoes: g.opcoes.map((o, k) => (k === oi ? { ...o, ...mudanca } : o)) } : g)));
+  const tirarOpcao = (gi, oi) =>
+    setGrupos((l) => l.map((g, j) => (j === gi ? { opcoes: g.opcoes.filter((_, k) => k !== oi) } : g)).filter((g) => g.opcoes.length));
+  const novaOpcao = (gi, p) => setGrupos((l) => l.map((g, j) => (j === gi ? { opcoes: [...g.opcoes, { produtoId: p.id, nome: p.nome, quantidade: "1" }] } : g)));
   const [solto, setSolto] = useState(produto?.produtoSolto || null);
   const [prioridade, setPrioridade] = useState(String(produto?.prioridadeMontagem ?? 0));
   const [salvando, setSalvando] = useState(false);
@@ -37,7 +46,7 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
     try {
       const { data } = await api.put(`/recebimentos/montagem/produtos/${alvo.id}`, {
         controlaMontagem: ligar,
-        capsulas: capsulas.map((c) => ({ produtoId: c.produtoId, quantidade: lerNumero(c.quantidade) || 1 })),
+        capsulas: grupos.map((g) => ({ opcoes: g.opcoes.map((o) => ({ produtoId: o.produtoId, quantidade: lerNumero(o.quantidade) || 1 })) })),
         produtoSoltoId: solto?.id || null,
         prioridadeMontagem: lerNumero(prioridade),
       });
@@ -67,7 +76,7 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button loading={salvando} disabled={!alvo || !capsulas.length} onClick={() => salvar(true)}>
+          <Button loading={salvando} disabled={!alvo || !grupos.length} onClick={() => salvar(true)}>
             Salvar
           </Button>
         </>
@@ -92,35 +101,47 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
         )}
 
         <div>
-          <p className="mb-1.5 text-sm font-medium">
+          <p className="text-sm font-medium">
             Cápsulas por unidade <span className="text-primary">*</span>
           </p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Cada item abaixo é obrigatório (<strong>e</strong>). Dentro de um item, as opções são alternativas (<strong>ou</strong>): ex.: Pokemon 1 pol = um item com "branca" ou "vermelha" — 2 mil
+            brancas + 3 mil vermelhas montam 5 mil.
+          </p>
           <div className="space-y-2">
-            {capsulas.map((c, i) => (
-              <div key={c.produtoId} className="flex items-center gap-2 rounded-lg border border-border p-2">
-                <span className="flex-1 text-sm">{c.nome}</span>
-                <Input
-                  className="h-9 w-20 text-center"
-                  inputMode="numeric"
-                  value={c.quantidade}
-                  onChange={(e) => setCapsulas((l) => l.map((x, j) => (j === i ? { ...x, quantidade: e.target.value.replace(/\D/g, "") } : x)))}
-                />
-                <span className="text-xs text-muted-foreground">por unidade</span>
-                <button type="button" className="rounded p-1.5 text-red-600 hover:bg-red-50" onClick={() => setCapsulas((l) => l.filter((_, j) => j !== i))} aria-label="Remover">
-                  <Trash2 className="h-4 w-4" />
-                </button>
+            {grupos.map((g, gi) => (
+              <div key={gi} className="rounded-lg border border-border p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Item {gi + 1}
+                  {g.opcoes.length > 1 && " · qualquer uma das opções"}
+                </p>
+                <div className="space-y-1.5">
+                  {g.opcoes.map((o, oi) => (
+                    <div key={o.produtoId} className="flex items-center gap-2">
+                      {oi > 0 && <span className="w-6 text-center text-xs font-bold text-blue-700">ou</span>}
+                      {oi === 0 && g.opcoes.length > 1 && <span className="w-6" />}
+                      <span className="flex-1 text-sm">{o.nome}</span>
+                      <Input className="h-8 w-16 text-center" inputMode="numeric" value={o.quantidade} onChange={(e) => setOpcao(gi, oi, { quantidade: e.target.value.replace(/\D/g, "") })} />
+                      <span className="text-xs text-muted-foreground">por un.</span>
+                      <button type="button" className="rounded p-1 text-red-600 hover:bg-red-50" onClick={() => tirarOpcao(gi, oi)} aria-label="Remover">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2">
+                  <ProdutoBusca placeholder="+ alternativa (ou) — ex.: Cápsula 1 pol vermelha" excluir={[alvo?.id, ...usadas].filter(Boolean)} onEscolher={(p) => novaOpcao(gi, p)} />
+                </div>
               </div>
             ))}
           </div>
           <div className="mt-2">
             <ProdutoBusca
-              placeholder="Adicionar cápsula (ex.: Cápsula 1 pol vermelha)..."
-              excluir={[alvo?.id, ...capsulas.map((c) => c.produtoId)].filter(Boolean)}
-              onEscolher={(p) => setCapsulas((l) => [...l, { produtoId: p.id, nome: p.nome, quantidade: "1" }])}
+              placeholder={grupos.length ? "+ outra cápsula obrigatória (e)..." : "Adicionar cápsula (ex.: Cápsula 1 pol branca)..."}
+              excluir={[alvo?.id, ...usadas].filter(Boolean)}
+              onEscolher={(p) => setGrupos((l) => [...l, { opcoes: [{ produtoId: p.id, nome: p.nome, quantidade: "1" }] }])}
             />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Cápsula de duas cores (ex.: vermelha e branca): adicione as duas. Ainda não cadastrou a cor? Use "Nova cápsula" na aba Cápsulas.
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Ainda não cadastrou a cor? Use "Nova cápsula" na aba Cápsulas e compras.</p>
           </div>
         </div>
 
@@ -134,7 +155,7 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
                 </Button>
               </div>
             ) : (
-              <ProdutoBusca placeholder="Sem vínculo (controle interno)" excluir={[alvo?.id, ...capsulas.map((c) => c.produtoId)].filter(Boolean)} onEscolher={setSolto} />
+              <ProdutoBusca placeholder="Sem vínculo (controle interno)" excluir={[alvo?.id, ...usadas].filter(Boolean)} onEscolher={setSolto} />
             )}
           </Bloco>
           <Field label="Prioridade" dica="Quando as cápsulas não dão para todos, a maior prioridade monta primeiro.">
@@ -148,7 +169,8 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
 
 function EnviarMontagem({ produto, onFechar, onSalvo }) {
   const toast = useToast();
-  const capacidade = Math.max(0, Math.min(produto.solto, ...produto.capsulas.map((c) => Math.floor(c.estoque / c.quantidade))));
+  const capacidadeItem = (g) => g.opcoes.reduce((s, o) => s + Math.floor(Math.max(0, o.estoque) / o.quantidade), 0);
+  const capacidade = Math.max(0, Math.min(produto.solto, ...produto.capsulas.map(capacidadeItem)));
   const [quantidade, setQuantidade] = useState(String(capacidade || ""));
   const [observacao, setObservacao] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -186,12 +208,10 @@ function EnviarMontagem({ produto, onFechar, onSalvo }) {
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-sm">
           <span className="text-muted-foreground">Brinquedos sem cápsula</span>
           <span className="text-right font-semibold">{un(produto.solto)}</span>
-          {produto.capsulas.map((c) => (
-            <span key={c.produtoId} className="contents">
-              <span className="text-muted-foreground">
-                {c.nome} (×{c.quantidade})
-              </span>
-              <span className="text-right font-semibold">{un(c.estoque)}</span>
+          {produto.capsulas.map((g, i) => (
+            <span key={i} className="contents">
+              <span className="text-muted-foreground">{g.opcoes.map((o) => `${o.nome} (${un(o.estoque)})`).join(" ou ")}</span>
+              <span className="text-right font-semibold">dá {un(capacidadeItem(g))}</span>
             </span>
           ))}
           <span className="font-medium">Dá para enviar agora</span>
@@ -396,9 +416,15 @@ export function AbaMontagem({ painel, onPainel }) {
                   <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-bold text-white">{un(p.estoque)}</span>
                 </Td>
                 <Td className="text-left text-xs">
-                  {p.capsulas.map((c) => (
-                    <span key={c.produtoId} className="block whitespace-nowrap">
-                      {c.quantidade}× {c.nome} <span className="text-muted-foreground">({un(c.estoque)})</span>
+                  {p.capsulas.map((g, i) => (
+                    <span key={i} className="block">
+                      {g.opcoes.map((o, k) => (
+                        <span key={o.produtoId} className="whitespace-nowrap">
+                          {k > 0 && <strong className="text-blue-700"> ou </strong>}
+                          {o.quantidade}× {o.nome} <span className="text-muted-foreground">({un(o.estoque)})</span>
+                        </span>
+                      ))}
+                      {g.falta > 0 && <span className="ml-1 font-semibold text-red-600">· faltam {un(g.falta)}</span>}
                     </span>
                   ))}
                 </Td>
@@ -573,7 +599,8 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
   const toast = useToast();
   const confirmar = useConfirm();
   const [dialogo, setDialogo] = useState(null);
-  const faltando = painel.capsulas.filter((c) => c.falta > 0);
+  const faltando = painel.faltas || [];
+  const comprarFaltas = (lista) => onComprar(lista.map((f) => ({ ...f.opcoes[0], falta: f.falta })));
 
   const marcar = async (p, ehCapsula) => {
     if (!ehCapsula) {
@@ -598,7 +625,7 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
             </p>
             <p className="text-sm text-amber-900">{faltando.map((c) => `${un(c.falta)} ${c.nome}`).join(" · ")}</p>
           </div>
-          <Button variant="info" onClick={() => onComprar(faltando)}>
+          <Button variant="info" onClick={() => comprarFaltas(faltando)}>
             Criar pré-recebimento da compra
           </Button>
         </div>
@@ -621,7 +648,7 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
         <Table>
           <thead>
             <tr>
-              {["Cápsula", "Em estoque", "Precisa p/ montar tudo", "Falta comprar", "Usada em", ""].map((c) => (
+              {["Cápsula", "Em estoque", "Falta comprar", "Usada em", ""].map((c) => (
                 <Th key={c}>{c}</Th>
               ))}
             </tr>
@@ -642,13 +669,20 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
                   </div>
                 </Td>
                 <Td className="font-semibold">{un(c.estoque)}</Td>
-                <Td>{un(c.precisa)}</Td>
-                <Td>{c.falta > 0 ? <span className="font-bold text-red-600">{un(c.falta)}</span> : <span className="text-emerald-700">0</span>}</Td>
+                <Td>
+                  {c.falta > 0 ? <span className="font-bold text-red-600">{un(c.falta)}</span> : <span className="text-emerald-700">0</span>}
+                  {c.faltaEmAlternativas?.map((f) => (
+                    <span key={f.nome} className="block text-[11px] text-amber-800">
+                      {un(f.falta)} de {f.nome}
+                    </span>
+                  ))}
+                </Td>
                 <Td className="text-left text-xs">
                   {c.produtos.length
                     ? c.produtos.map((p) => (
                         <span key={p.id} className="block">
-                          {p.nome}: {un(p.precisa)}
+                          {p.nome}
+                          {p.alternativa && <span className="text-muted-foreground"> (alternativa)</span>}
                         </span>
                       ))
                     : "—"}
