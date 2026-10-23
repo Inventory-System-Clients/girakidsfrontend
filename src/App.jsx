@@ -38,11 +38,11 @@ const Correios = lazy(() => import("./pages/comercial/Correios").then((m) => ({ 
 const Protegida = ({ permissoes, children }) => <PrivateRoute permissoes={permissoes}>{children}</PrivateRoute>;
 
 // Giraldo aparece para clientes e visitantes em todo o site; para a equipe,
-// só no catálogo (nas telas internas atrapalharia).
+// só no catálogo e no carrinho (nas telas internas atrapalharia).
 function GiraldoNoSite() {
   const { interno } = useAuth();
   const { pathname } = useLocation();
-  if (interno && !(pathname === "/" || pathname === "/catalogo" || pathname.startsWith("/produto/"))) return null;
+  if (interno && !(pathname === "/" || pathname === "/catalogo" || pathname === "/checkout" || pathname.startsWith("/produto/"))) return null;
   return <Giraldo />;
 }
 

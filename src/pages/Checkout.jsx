@@ -334,7 +334,7 @@ export default function Checkout({ modo = "pedido" }) {
     .filter(([campo]) => !String(cliente[campo] || "").trim())
     .map(([, rotulo]) => rotulo);
   useEffect(() => {
-    if (interno || orcamento) return;
+    if (orcamento) return;
     publicarCheckout({
       metodoEnvio: metodoEnvio || null,
       formaPagamento: forma || null,
@@ -350,7 +350,7 @@ export default function Checkout({ modo = "pedido" }) {
     });
   });
   useEffect(() => {
-    if (interno || orcamento) return undefined;
+    if (orcamento) return undefined;
     return ouvirComandosGiraldo(async (c) => {
       if (c.tipo === "entrega") setMetodoEnvio(c.metodoEnvio);
       else if (c.tipo === "pagamento") setForma(c.formaPagamento);
@@ -367,7 +367,7 @@ export default function Checkout({ modo = "pedido" }) {
         setTimeout(() => enviarRef.current?.(), 300);
       }
     });
-  }, [interno, orcamento]);
+  }, [orcamento]);
 
   if (orcamentoGerado) {
     return (
