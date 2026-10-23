@@ -10,6 +10,7 @@ const LOGOS = {
   mercadopago: { sigla: "MP", cor: "bg-sky-500/15 text-sky-700" },
   sumup: { sigla: "SU", cor: "bg-slate-900 text-white" },
   stone: { sigla: "ST", cor: "bg-emerald-500/15 text-emerald-700" },
+  getnet: { sigla: "GN", cor: "bg-red-500/15 text-red-700" },
 };
 
 const CANAIS = [
@@ -20,6 +21,7 @@ const CANAIS = [
     detalhes: {
       mercadopago: "PIX com QR Code na tela e cartão na página do Mercado Pago. Confirmação por webhook.",
       sumup: "PIX com QR Code na tela e cartão na página da SumUp. Confirmação por consulta automática.",
+      getnet: "PIX com QR Code na tela (confirmação pela notificação da Getnet) e cartão no link Getpay.",
     },
   },
   {
@@ -169,6 +171,7 @@ function Credenciais({ provedor, onSalvo }) {
         {provedor.webhookUrl && (
           <div className="rounded-lg bg-slate-50 p-3 text-xs">
             <p className="mb-1 font-semibold">Endereço de notificação (webhook) para cadastrar no {provedor.rotulo}:</p>
+            {provedor.ajudaWebhook && <p className="mb-1 text-muted-foreground">{provedor.ajudaWebhook}</p>}
             <div className="flex items-center gap-2">
               <code className="flex-1 break-all">{provedor.webhookUrl}</code>
               <Button type="button" size="sm" variant="outline" onClick={() => copiar(provedor.webhookUrl)}>
@@ -418,7 +421,7 @@ export default function Pagamentos() {
         <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold">
           <KeyRound className="h-5 w-5 text-primary" /> Credenciais dos bancos
         </h2>
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
           {dados.provedores.map((p) => (
             <Credenciais key={`${p.nome}-${p.validadoEm}`} provedor={p} onSalvo={setDados} />
           ))}
