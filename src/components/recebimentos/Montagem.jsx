@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, Boxes, Plus, Settings2, ShoppingCart, Trash2 } from "lucide-react";
 import api, { mensagemErro } from "../../services/api";
-import { Button, Card, Dialog, EmptyState, Field, Input, RowMenu, Select, Switch, Table, Td, Th, cx, useConfirm, useToast } from "../ui";
+import { Button, Card, Dialog, EmptyState, Field, Input, RowMenu, Segmented, Select, Switch, Table, Td, Th, cx, useConfirm, useToast } from "../ui";
 import { dataHora, lerNumero } from "../../utils/format";
 import { Miniatura, ProdutoBusca, SALDOS, atualizarAlertasRecebimentos, un } from "./comum";
 
@@ -102,7 +102,7 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
 
         <div>
           <p className="text-sm font-medium">
-            Cápsulas por unidade <span className="text-primary">*</span>
+            Cápsulas e sleeves por unidade <span className="text-primary">*</span>
           </p>
           <p className="mb-2 text-xs text-muted-foreground">
             Cada item abaixo é obrigatório (<strong>e</strong>). Dentro de um item, as opções são alternativas (<strong>ou</strong>): ex.: Pokemon 1 pol = um item com "branca" ou "vermelha" — 2 mil
@@ -130,18 +130,18 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
                   ))}
                 </div>
                 <div className="mt-2">
-                  <ProdutoBusca placeholder="+ alternativa (ou) — ex.: Cápsula 1 pol vermelha" excluir={[alvo?.id, ...usadas].filter(Boolean)} onEscolher={(p) => novaOpcao(gi, p)} />
+                  <ProdutoBusca placeholder="+ alternativa (ou) — ex.: Cápsula 1 pol vermelha ou outro sleeve" excluir={[alvo?.id, ...usadas].filter(Boolean)} onEscolher={(p) => novaOpcao(gi, p)} />
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-2">
             <ProdutoBusca
-              placeholder={grupos.length ? "+ outra cápsula obrigatória (e)..." : "Adicionar cápsula (ex.: Cápsula 1 pol branca)..."}
+              placeholder={grupos.length ? "+ outra cápsula ou sleeve obrigatório (e)..." : "Adicionar cápsula ou sleeve (ex.: Cápsula 1 pol branca)..."}
               excluir={[alvo?.id, ...usadas].filter(Boolean)}
               onEscolher={(p) => setGrupos((l) => [...l, { opcoes: [{ produtoId: p.id, nome: p.nome, quantidade: "1" }] }])}
             />
-            <p className="mt-1 text-xs text-muted-foreground">Ainda não cadastrou a cor? Use "Nova cápsula" na aba Cápsulas e compras.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Ainda não cadastrou a cor? Use "Nova cápsula ou sleeve" na aba Cápsulas, sleeves e compras.</p>
           </div>
         </div>
 
@@ -259,7 +259,7 @@ export function AjustarSaldo({ produto, saldos, onFechar, onSalvo }) {
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button loading={salvando} disabled={!motivo.trim() || quantidade === ""} onClick={salvar}>
+          <Button loading={salvando} disabled={quantidade === ""} onClick={salvar}>
             Salvar ajuste
           </Button>
         </>
@@ -286,7 +286,7 @@ export function AjustarSaldo({ produto, saldos, onFechar, onSalvo }) {
         <Field label="Quantidade correta (unidades)">
           <Input inputMode="numeric" value={quantidade} onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ""))} autoFocus />
         </Field>
-        <Field label="Motivo" obrigatorio>
+        <Field label="Observação (opcional)">
           <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: contagem física de 21/10" />
         </Field>
       </div>
@@ -521,14 +521,15 @@ export function AbaMontagem({ painel, onPainel }) {
 
 function NovaCapsula({ fornecedores, onFechar, onSalvo }) {
   const toast = useToast();
-  const [f, setF] = useState({ nome: "", tamanho: "1", venderNoCatalogo: false, precoVenda: "", unidadesPacote: "1", estoqueInicial: "", fornecedorId: "" });
+  const [f, setF] = useState({ tipoInsumo: "CAPSULA", nome: "", tamanho: "1", venderNoCatalogo: false, precoVenda: "", unidadesPacote: "1", estoqueInicial: "", fornecedorId: "", margemPerda: "", avisoCompraAbaixo: "" });
   const [salvando, setSalvando] = useState(false);
   const set = (c) => (e) => setF({ ...f, [c]: e.target.value });
+  const sleeve = f.tipoInsumo === "SLEEVE";
   const salvar = async () => {
     setSalvando(true);
     try {
       await api.post("/recebimentos/capsulas", { ...f, precoVenda: lerNumero(f.precoVenda), estoqueInicial: lerNumero(f.estoqueInicial) });
-      toast({ titulo: "Cápsula cadastrada" });
+      toast({ titulo: sleeve ? "Sleeve cadastrado" : "Cápsula cadastrada" });
       onSalvo();
     } catch (error) {
       toast({ titulo: "Erro ao cadastrar", descricao: mensagemErro(error), tipo: "erro" });
@@ -540,8 +541,8 @@ function NovaCapsula({ fornecedores, onFechar, onSalvo }) {
     <Dialog
       aberto
       onFechar={onFechar}
-      titulo="Nova cápsula"
-      descricao="Cadastre cada cor/tamanho que vocês compram. Ela fica disponível para montar produtos e para receber de fornecedores."
+      titulo={sleeve ? "Novo sleeve" : "Nova cápsula"}
+      descricao="Cadastre cada cápsula (cor/tamanho) ou sleeve que vocês compram. Fica disponível para montar produtos e para receber de fornecedores."
       rodape={
         <>
           <Button variant="outline" onClick={onFechar}>
@@ -554,16 +555,28 @@ function NovaCapsula({ fornecedores, onFechar, onSalvo }) {
       }
     >
       <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Tipo" className="sm:col-span-2">
+          <Segmented
+            value={f.tipoInsumo}
+            onChange={(v) => setF({ ...f, tipoInsumo: v })}
+            opcoes={[
+              { value: "CAPSULA", label: "Cápsula" },
+              { value: "SLEEVE", label: "Sleeve" },
+            ]}
+          />
+        </Field>
         <Field label="Nome" obrigatorio className="sm:col-span-2">
-          <Input value={f.nome} onChange={set("nome")} placeholder="Ex.: Cápsula 1 pol vermelha" autoFocus />
+          <Input value={f.nome} onChange={set("nome")} placeholder={sleeve ? "Ex.: Sleeve Minecraft 1 polegada" : "Ex.: Cápsula 1 pol vermelha"} autoFocus />
         </Field>
-        <Field label="Tamanho">
-          <Select value={f.tamanho} onChange={set("tamanho")}>
-            <option value="1">1 polegada</option>
-            <option value="2">2 polegadas</option>
-            <option value="105">105 mm</option>
-          </Select>
-        </Field>
+        {!sleeve && (
+          <Field label="Tamanho">
+            <Select value={f.tamanho} onChange={set("tamanho")}>
+              <option value="1">1 polegada</option>
+              <option value="2">2 polegadas</option>
+              <option value="105">105 mm</option>
+            </Select>
+          </Field>
+        )}
         <Field label="Fornecedor de costume">
           <Select value={f.fornecedorId} onChange={set("fornecedorId")}>
             <option value="">—</option>
@@ -576,6 +589,12 @@ function NovaCapsula({ fornecedores, onFechar, onSalvo }) {
         </Field>
         <Field label="Estoque atual (unidades)">
           <Input inputMode="numeric" value={f.estoqueInicial} onChange={set("estoqueInicial")} placeholder="0" />
+        </Field>
+        <Field label="Margem de perda (%)" dica={`Vazio = padrão (${sleeve ? "10%" : "0%"}). Entra a mais na sugestão de compra.`}>
+          <Input inputMode="decimal" value={f.margemPerda} onChange={set("margemPerda")} placeholder={sleeve ? "10" : "0"} />
+        </Field>
+        <Field label="Avisar quando chegar em" dica={`Vazio = padrão (${sleeve ? "500 un." : "sem aviso"}).`}>
+          <Input inputMode="numeric" value={f.avisoCompraAbaixo} onChange={set("avisoCompraAbaixo")} placeholder={sleeve ? "500" : "—"} />
         </Field>
         <div className="flex items-end pb-2">
           <Switch label="Vender no catálogo" checked={f.venderNoCatalogo} onChange={(v) => setF({ ...f, venderNoCatalogo: v })} />
@@ -595,16 +614,77 @@ function NovaCapsula({ fornecedores, onFechar, onSalvo }) {
   );
 }
 
+// Regras de compra de um insumo já cadastrado.
+function RegrasInsumo({ insumo, onFechar, onSalvo }) {
+  const toast = useToast();
+  const [f, setF] = useState({
+    tipoInsumo: insumo.tipoInsumo,
+    margemPerda: insumo.margemDefinida ? String(insumo.margemPerda) : "",
+    avisoCompraAbaixo: insumo.avisoDefinido ? String(insumo.avisoCompraAbaixo ?? "") : "",
+  });
+  const [salvando, setSalvando] = useState(false);
+  const sleeve = f.tipoInsumo === "SLEEVE";
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      const { data } = await api.put(`/recebimentos/insumos/${insumo.id}`, f);
+      toast({ titulo: "Regras de compra salvas" });
+      onSalvo(data);
+    } catch (error) {
+      toast({ titulo: "Erro", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setSalvando(false);
+    }
+  };
+  return (
+    <Dialog
+      aberto
+      onFechar={onFechar}
+      titulo={`Regras de compra · ${insumo.nome}`}
+      rodape={
+        <>
+          <Button variant="outline" onClick={onFechar}>
+            Cancelar
+          </Button>
+          <Button loading={salvando} onClick={salvar}>
+            Salvar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <Field label="Tipo">
+          <Segmented
+            value={f.tipoInsumo}
+            onChange={(v) => setF({ ...f, tipoInsumo: v })}
+            opcoes={[
+              { value: "CAPSULA", label: "Cápsula" },
+              { value: "SLEEVE", label: "Sleeve" },
+            ]}
+          />
+        </Field>
+        <Field label="Margem de perda (%)" dica={`A sugestão de compra soma esta % a mais. Vazio = padrão (${sleeve ? "10%" : "0%"}).`}>
+          <Input inputMode="decimal" value={f.margemPerda} onChange={(e) => setF({ ...f, margemPerda: e.target.value })} placeholder={sleeve ? "10" : "0"} />
+        </Field>
+        <Field label="Avisar que está acabando quando chegar em (unidades)" dica={`Vazio = padrão (${sleeve ? "500" : "sem aviso"}). Use 0 para não avisar.`}>
+          <Input inputMode="numeric" value={f.avisoCompraAbaixo} onChange={(e) => setF({ ...f, avisoCompraAbaixo: e.target.value.replace(/\D/g, "") })} placeholder={sleeve ? "500" : "—"} />
+        </Field>
+      </div>
+    </Dialog>
+  );
+}
+
 export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onComprar }) {
   const toast = useToast();
   const confirmar = useConfirm();
   const [dialogo, setDialogo] = useState(null);
   const faltando = painel.faltas || [];
-  const comprarFaltas = (lista) => onComprar(lista.map((f) => ({ ...f.opcoes[0], falta: f.falta })));
+  const acabando = painel.acabando || [];
+  const comprarFaltas = (lista) => onComprar(lista.map((f) => ({ ...f.opcoes[0], falta: f.sugestao ?? f.falta })));
 
   const marcar = async (p, ehCapsula) => {
     if (!ehCapsula) {
-      const ok = await confirmar({ titulo: `Tirar "${p.nome}" das cápsulas?`, mensagem: "Ele continua existindo como produto, só sai desta lista.", confirmar: "Tirar" });
+      const ok = await confirmar({ titulo: `Tirar "${p.nome}" desta lista?`, mensagem: "Ele continua existindo como produto, só deixa de ser cápsula/sleeve de montagem.", confirmar: "Tirar" });
       if (!ok) return;
     }
     try {
@@ -621,9 +701,21 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
         <div className="flex flex-col gap-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="flex items-center gap-2 font-semibold text-amber-900">
-              <ShoppingCart className="h-5 w-5" /> Comprar cápsulas para montar tudo o que chegou
+              <ShoppingCart className="h-5 w-5" /> Comprar para montar tudo o que chegou
             </p>
-            <p className="text-sm text-amber-900">{faltando.map((c) => `${un(c.falta)} ${c.nome}`).join(" · ")}</p>
+            <ul className="mt-1 space-y-0.5 text-sm text-amber-900">
+              {faltando.map((c) => (
+                <li key={c.chave}>
+                  <strong>{un(c.sugestao)}</strong> {c.nome}
+                  {c.margem > 0 && (
+                    <span className="text-xs">
+                      {" "}
+                      (faltam {un(c.falta)} + {c.margem}% de perda)
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
           <Button variant="info" onClick={() => comprarFaltas(faltando)}>
             Criar pré-recebimento da compra
@@ -631,36 +723,65 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
         </div>
       )}
 
+      {acabando.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border-2 border-red-300 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="flex items-center gap-2 font-semibold text-red-800">
+              <AlertTriangle className="h-5 w-5" /> Está acabando — precisa comprar
+            </p>
+            <ul className="mt-1 space-y-0.5 text-sm text-red-900">
+              {acabando.map((c) => (
+                <li key={c.id}>
+                  {c.nome}: restam <strong>{un(c.estoque)}</strong> (aviso em {un(c.avisoCompraAbaixo)})
+                </li>
+              ))}
+            </ul>
+          </div>
+          <Button variant="danger" onClick={() => onComprar(acabando.map((c) => ({ ...c, falta: c.sugestao })))}>
+            Comprar os que estão acabando
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => setDialogo({ nome: "nova" })}>
-          <Plus className="h-4 w-4" /> Nova cápsula
+          <Plus className="h-4 w-4" /> Nova cápsula ou sleeve
         </Button>
         <div className="w-full sm:w-80">
-          <ProdutoBusca placeholder="Marcar produto existente como cápsula..." onEscolher={(p) => marcar(p, true)} />
+          <ProdutoBusca placeholder="Marcar produto existente (ex.: SLEEVE MINECRAFT)..." onEscolher={(p) => marcar(p, true)} />
         </div>
       </div>
 
       {!painel.capsulas.length ? (
         <Card>
-          <EmptyState icon={Boxes} titulo="Nenhuma cápsula cadastrada" descricao="Cadastre as cápsulas (cor e tamanho) ou marque produtos existentes, como 'Cápsulas 1 pol vazias'." />
+          <EmptyState
+            icon={Boxes}
+            titulo="Nenhuma cápsula ou sleeve cadastrado"
+            descricao="Cadastre as cápsulas e sleeves ou marque produtos existentes, como 'Cápsulas 1 pol vazias' ou 'SLEEVE MINECRAFT 1 POLEGADA'."
+          />
         </Card>
       ) : (
         <Table>
           <thead>
             <tr>
-              {["Cápsula", "Em estoque", "Falta comprar", "Usada em", ""].map((c) => (
+              {["Item", "Em estoque", "Aviso em", "Perda", "Falta", "Sugestão de compra", "Usado em", ""].map((c) => (
                 <Th key={c}>{c}</Th>
               ))}
             </tr>
           </thead>
           <tbody>
             {painel.capsulas.map((c) => (
-              <tr key={c.id} className={cx("hover:bg-muted/40", c.falta > 0 && "bg-amber-50")}>
+              <tr key={c.id} className={cx("hover:bg-muted/40", c.acabando ? "bg-red-50" : c.falta > 0 && "bg-amber-50")}>
                 <Td className="text-left">
                   <div className="flex items-center gap-2">
                     <Miniatura src={c.imagemUrl} />
                     <div>
-                      <p className="font-medium">{c.nome}</p>
+                      <p className="flex items-center gap-1.5 font-medium">
+                        {c.nome}
+                        <span className={cx("rounded px-1.5 py-0.5 text-[10px] font-bold", c.tipoInsumo === "SLEEVE" ? "bg-violet-100 text-violet-800" : "bg-sky-100 text-sky-800")}>
+                          {c.tipoInsumo === "SLEEVE" ? "Sleeve" : "Cápsula"}
+                        </span>
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         SKU {c.sku}
                         {c.arquivado ? " · só controle (fora do catálogo)" : " · à venda no catálogo"}
@@ -668,7 +789,12 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
                     </div>
                   </div>
                 </Td>
-                <Td className="font-semibold">{un(c.estoque)}</Td>
+                <Td>
+                  <span className={cx("font-semibold", c.acabando && "text-red-600")}>{un(c.estoque)}</span>
+                  {c.acabando && <span className="block text-[11px] font-bold text-red-600">acabando</span>}
+                </Td>
+                <Td className="text-xs">{c.avisoCompraAbaixo ? un(c.avisoCompraAbaixo) : "—"}</Td>
+                <Td className="text-xs">{c.margemPerda ? `${c.margemPerda}%` : "—"}</Td>
                 <Td>
                   {c.falta > 0 ? <span className="font-bold text-red-600">{un(c.falta)}</span> : <span className="text-emerald-700">0</span>}
                   {c.faltaEmAlternativas?.map((f) => (
@@ -677,6 +803,7 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
                     </span>
                   ))}
                 </Td>
+                <Td>{c.sugestaoCompra > 0 ? <strong className="text-blue-700">{un(c.sugestaoCompra)}</strong> : "—"}</Td>
                 <Td className="text-left text-xs">
                   {c.produtos.length
                     ? c.produtos.map((p) => (
@@ -690,13 +817,14 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
                 <Td>
                   <RowMenu
                     itens={[
+                      { label: "Regras de compra (perda e aviso)", icone: Settings2, onClick: () => setDialogo({ nome: "regras", insumo: c }) },
                       {
                         label: "Ajustar estoque",
                         icone: Settings2,
                         onClick: () => setDialogo({ nome: "ajustar", produto: c, saldos: { ESTOQUE: { label: "Estoque", atual: c.estoque } } }),
                       },
-                      { label: "Comprar", icone: ShoppingCart, onClick: () => onComprar([{ ...c, falta: c.falta || 0 }]) },
-                      { label: "Tirar das cápsulas", icone: Trash2, perigo: true, onClick: () => marcar(c, false) },
+                      { label: "Comprar", icone: ShoppingCart, onClick: () => onComprar([{ ...c, falta: c.sugestaoCompra || 0 }]) },
+                      { label: "Tirar desta lista", icone: Trash2, perigo: true, onClick: () => marcar(c, false) },
                     ]}
                   />
                 </Td>
@@ -713,6 +841,17 @@ export function AbaCapsulas({ painel, fornecedores, onPainel, onRecarregar, onCo
           onSalvo={() => {
             setDialogo(null);
             onRecarregar();
+          }}
+        />
+      )}
+      {dialogo?.nome === "regras" && (
+        <RegrasInsumo
+          insumo={dialogo.insumo}
+          onFechar={() => setDialogo(null)}
+          onSalvo={(d) => {
+            setDialogo(null);
+            onPainel(d);
+            atualizarAlertasRecebimentos();
           }}
         />
       )}

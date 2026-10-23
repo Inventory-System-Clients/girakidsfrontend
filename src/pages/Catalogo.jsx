@@ -157,6 +157,23 @@ export default function Catalogo() {
     </section>
   );
 
+  // Estoque em tempo real: recarrega em silêncio a cada 20 s e ao voltar para a aba.
+  useEffect(() => {
+    const recarregar = () => {
+      if (document.visibilityState !== "visible") return;
+      api
+        .get("/catalogo", { params: { categoria: categoria || undefined, busca: buscaAplicada || undefined, pagina, limite: POR_PAGINA } })
+        .then(({ data }) => setDados(data))
+        .catch(() => {});
+    };
+    const t = setInterval(recarregar, 20000);
+    document.addEventListener("visibilitychange", recarregar);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", recarregar);
+    };
+  }, [categoria, buscaAplicada, pagina]);
+
   const paginas = dados?.paginas || 1;
   const numerosPagina = [...new Set([1, pagina - 1, pagina, pagina + 1, paginas])].filter((n) => n >= 1 && n <= paginas).sort((a, b) => a - b);
 

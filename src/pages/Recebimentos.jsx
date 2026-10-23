@@ -20,7 +20,8 @@ const FILTROS = {
 function FaixaAlertas({ alertas, onAbrir, onAba }) {
   if (!alertas) return null;
   const { divergencias, respostas, atrasados, capsulasFaltando } = alertas;
-  if (!divergencias.length && !respostas.length && !atrasados.length && !capsulasFaltando.length) return null;
+  const acabando = alertas.insumosAcabando || [];
+  if (!divergencias.length && !respostas.length && !atrasados.length && !capsulasFaltando.length && !acabando.length) return null;
   return (
     <div className="mb-5 grid gap-2 lg:grid-cols-2">
       {divergencias.map((d) => (
@@ -45,7 +46,15 @@ function FaixaAlertas({ alertas, onAbrir, onAba }) {
         <button type="button" onClick={() => onAba("capsulas")} className="flex items-start gap-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-left hover:bg-amber-100">
           <ShoppingCart className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
           <span className="text-sm text-amber-900">
-            <strong>Comprar cápsulas:</strong> {capsulasFaltando.map((c) => `${un(c.falta)} ${c.nome}`).join(" · ")}
+            <strong>Comprar:</strong> {capsulasFaltando.map((c) => `${un(c.sugestao ?? c.falta)} ${c.nome}`).join(" · ")}
+          </span>
+        </button>
+      )}
+      {acabando.length > 0 && (
+        <button type="button" onClick={() => onAba("capsulas")} className="flex items-start gap-3 rounded-lg border-2 border-red-300 bg-red-50 p-3 text-left hover:bg-red-100">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+          <span className="text-sm text-red-900">
+            <strong>Está acabando:</strong> {acabando.map((c) => `${c.nome} (restam ${un(c.estoque)})`).join(" · ")}
           </span>
         </button>
       )}
@@ -259,7 +268,7 @@ export default function Recebimentos() {
         abas={[
           { value: "recebimentos", label: "Pré-recebimentos", contador: (alertas?.respostas.length || 0) + (alertas?.divergencias.length || 0) },
           { value: "montagem", label: "Montagem", contador: painel?.ordens.length || 0 },
-          { value: "capsulas", label: "Cápsulas e compras", contador: alertas?.capsulasFaltando.length || 0 },
+          { value: "capsulas", label: "Cápsulas, sleeves e compras", contador: (alertas?.capsulasFaltando.length || 0) + (alertas?.insumosAcabando?.length || 0) },
           { value: "fornecedores", label: "Fornecedores" },
           { value: "historico", label: "Histórico" },
         ]}

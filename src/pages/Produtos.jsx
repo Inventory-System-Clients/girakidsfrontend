@@ -398,15 +398,67 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
   );
 }
 
+// Estoque editável direto na tabela: clica, digita e Enter (sem explicação).
+function EstoqueEditavel({ produto, onSalvo }) {
+  const toast = useToast();
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const salvar = async () => {
+    const nova = Number(valor);
+    if (valor === "" || nova === produto.estoque) return setEditando(false);
+    setSalvando(true);
+    try {
+      await api.post(`/produtos/${produto.id}/estoque`, { quantidade: nova });
+      toast({ titulo: "Estoque ajustado", descricao: `${produto.nome}: ${numero(nova)} un. (já vale no catálogo)` });
+      setEditando(false);
+      onSalvo();
+    } catch (error) {
+      toast({ titulo: "Erro ao ajustar estoque", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setSalvando(false);
+    }
+  };
+  if (!editando) {
+    return (
+      <button
+        type="button"
+        title="Clique para ajustar o estoque"
+        className="rounded px-2 py-1 font-medium hover:bg-primary-soft hover:text-primary"
+        onClick={() => {
+          setValor(String(produto.estoque));
+          setEditando(true);
+        }}
+      >
+        {numero(produto.estoque)}
+      </button>
+    );
+  }
+  return (
+    <input
+      autoFocus
+      inputMode="numeric"
+      disabled={salvando}
+      className="input h-8 w-24 text-center"
+      value={valor}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => setValor(e.target.value.replace(/\D/g, ""))}
+      onBlur={salvar}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") setEditando(false);
+      }}
+    />
+  );
+}
+
 function AjustarEstoque({ produto, onFechar, onSalvo }) {
   const toast = useToast();
   const [quantidade, setQuantidade] = useState(String(produto.estoque));
-  const [motivo, setMotivo] = useState("");
-  const erro =
-    !/^\d+$/.test(quantidade) ? "Quantidade deve ser um número válido" : Number(quantidade) === produto.estoque ? "Nova quantidade é igual à quantidade atual" : motivo.trim().length < 10 ? "Motivo deve ter pelo menos 10 caracteres" : "";
+  const erro = !/^\d+$/.test(quantidade) ? "Quantidade deve ser um número válido" : "";
   const salvar = async () => {
     try {
-      await api.post(`/produtos/${produto.id}/estoque`, { quantidade: Number(quantidade), motivo });
+      await api.post(`/produtos/${produto.id}/estoque`, { quantidade: Number(quantidade) });
       toast({ titulo: "Estoque ajustado" });
       onSalvo();
     } catch (error) {
@@ -434,11 +486,15 @@ function AjustarEstoque({ produto, onFechar, onSalvo }) {
           Quantidade Atual: <strong>{numero(produto.estoque)} un.</strong>
         </p>
         <Field label="Nova Quantidade" obrigatorio>
-          <Input value={quantidade} onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ""))} placeholder="Digite a nova quantidade" />
+          <Input
+            autoFocus
+            value={quantidade}
+            onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={(e) => e.key === "Enter" && !erro && salvar()}
+            placeholder="Digite a nova quantidade"
+          />
         </Field>
-        <Field label="Motivo do Ajuste" obrigatorio erro={motivo && erro ? erro : undefined}>
-          <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Descreva detalhadamente o motivo do ajuste de estoque (mínimo 10 caracteres)" />
-        </Field>
+        <p className="text-xs text-muted-foreground">O catálogo passa a mostrar a nova quantidade na hora.</p>
       </div>
     </Dialog>
   );
@@ -670,7 +726,9 @@ function GerenciarProdutos({ categorias }) {
                   "-"
                 )}
               </Td>
-              <Td>{numero(p.estoque)}</Td>
+              <Td>
+                <EstoqueEditavel produto={p} onSalvo={carregar} />
+              </Td>
               <Td>
                 <Badge variant={corStatus[p.statusEstoque]}>{STATUS[p.statusEstoque]}</Badge>
               </Td>
