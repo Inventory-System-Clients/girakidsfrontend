@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { BarChart3, ChevronDown, ChevronUp, Download, Search } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { BarChart3, ChevronDown, ChevronUp, Download, Landmark, Search } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import api, { mensagemErro } from "../services/api";
 import {
@@ -650,6 +651,8 @@ export default function Dashboard() {
   const aba = params.get("view") || "resumo";
   const [periodo, setPeriodo] = useState({ inicio: inicioMesISO(), fim: hojeISO() });
   const [atualizado] = useState(() => new Date());
+  const { usuario } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <div className="container-app py-6">
@@ -658,6 +661,11 @@ export default function Dashboard() {
         subtitulo="Leitura consolidada de caixa, recebíveis, margem, estoque e operação."
         extra={<p className="mt-1 text-xs text-muted-foreground">Atualizado em {dataHora(atualizado)}</p>}
       >
+        {usuario?.role === "ADMIN" && (
+          <Button variant="info" onClick={() => navigate("/pagamentos")}>
+            <Landmark className="h-4 w-4" /> Pagamentos (bancos)
+          </Button>
+        )}
         {aba !== "analise" && (
           <Button variant="secondary" onClick={() => setParams({ view: "analise" })}>
             <BarChart3 className="h-4 w-4" /> Análise de produtos

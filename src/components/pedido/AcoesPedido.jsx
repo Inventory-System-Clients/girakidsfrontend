@@ -16,6 +16,7 @@ import {
   Undo2,
   Upload,
   Send,
+  Smartphone,
 } from "lucide-react";
 import api, { enviarArquivo, mensagemErro } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
@@ -415,6 +416,143 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
 
 // Escolhe/troca a transportadora com as mesmas sugestões do checkout (as que
 // atendem a UF do cliente), mais nº da cotação e com quem foi cotado.
+// Status dos pagamentos integrados (lido uma vez por sessão).
+let statusPagamentosCache = null;
+const useStatusPagamentos = () => {
+  const [status, setStatus] = useState(statusPagamentosCache);
+  useEffect(() => {
+    if (statusPagamentosCache) return;
+    api
+      .get("/pagamentos/status")
+      .then(({ data: d }) => {
+        statusPagamentosCache = d;
+        setStatus(d);
+      })
+      .catch(() => {});
+  }, []);
+  return status;
+};
+
+// Envia a cobrança para a tela da maquininha e espera o banco confirmar.
+function MaquininhaDialog({ pedido: inicial, onFechar, onFeito }) {
+  const toast = useToast();
+  const [pedido, setPedido] = useState(inicial);
+  const [maquininhas, setMaquininhas] = useState(null);
+  const [escolhida, setEscolhida] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const aguardando = /^(point|reader|stone):/.test(pedido.pagamentoReferencia || "") && pedido.statusFinanceiro !== "PAGO";
+  const pago = pedido.statusFinanceiro === "PAGO";
+
+  useEffect(() => {
+    api.get("/pagamentos/maquininhas").then(({ data: d }) => {
+      setMaquininhas(d);
+      if (d.length === 1) setEscolhida(d[0].id);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!aguardando) return undefined;
+    const t = setInterval(async () => {
+      try {
+        const { data: d } = await api.post(`/pagamentos/pedidos/${pedido.id}/consultar`);
+        setPedido(d);
+        if (d.statusFinanceiro === "PAGO") {
+          toast({ titulo: "Pagamento aprovado na maquininha!", descricao: `Pedido ${d.numeroFormatado} pago e liberado.` });
+          onFeito(d);
+        }
+      } catch {
+        /* tenta de novo no próximo ciclo */
+      }
+    }, 4000);
+    return () => clearInterval(t);
+  }, [aguardando, pedido.id, toast, onFeito]);
+
+  const enviar = async () => {
+    setEnviando(true);
+    try {
+      const { data: d } = await api.post(`/pagamentos/pedidos/${pedido.id}/maquininha`, { maquininhaId: escolhida });
+      setPedido(d);
+      toast({ titulo: "Cobrança enviada", descricao: "Peça para o cliente pagar na maquininha." });
+    } catch (error) {
+      toast({ titulo: "Não foi possível enviar", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const cancelar = async () => {
+    setEnviando(true);
+    try {
+      const { data: d } = await api.post(`/pagamentos/pedidos/${pedido.id}/maquininha/cancelar`);
+      setPedido(d);
+      toast({ titulo: "Cobrança retirada da maquininha" });
+    } catch (error) {
+      toast({ titulo: "Erro", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <Dialog
+      aberto
+      onFechar={onFechar}
+      titulo={`Cobrar na maquininha · Pedido ${pedido.numeroFormatado}`}
+      descricao={`Valor: ${moeda(pedido.total)}`}
+      rodape={
+        pago ? (
+          <Button onClick={onFechar}>Fechar</Button>
+        ) : aguardando ? (
+          <>
+            <Button variant="danger-outline" loading={enviando} onClick={cancelar}>
+              Cancelar cobrança
+            </Button>
+            <Button variant="outline" onClick={onFechar}>
+              Fechar (continua aguardando)
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" onClick={onFechar}>
+              Cancelar
+            </Button>
+            <Button variant="info" loading={enviando} disabled={!escolhida} onClick={enviar}>
+              <Smartphone className="h-4 w-4" /> Enviar para a maquininha
+            </Button>
+          </>
+        )
+      }
+    >
+      {pago ? (
+        <p className="flex items-center gap-2 font-semibold text-emerald-700">
+          <CheckCircle2 className="h-5 w-5" /> Pagamento aprovado. Pedido liberado para a expedição.
+        </p>
+      ) : aguardando ? (
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <Smartphone className="h-10 w-10 animate-pulse text-blue-600" />
+          <p className="font-semibold">Aguardando o pagamento na maquininha...</p>
+          <p className="text-sm text-muted-foreground">Assim que o banco aprovar, o pedido fica pago e é liberado sozinho.</p>
+        </div>
+      ) : !maquininhas ? (
+        <p className="text-sm text-muted-foreground">Carregando maquininhas...</p>
+      ) : !maquininhas.length ? (
+        <p className="text-sm text-muted-foreground">Nenhuma maquininha cadastrada. O administrador cadastra em Administração → Pagamentos.</p>
+      ) : (
+        <Field label="Maquininha">
+          <Select value={escolhida} onChange={(e) => setEscolhida(e.target.value)}>
+            <option value="">Selecione</option>
+            {maquininhas.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nome}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+    </Dialog>
+  );
+}
+
 function TransportadoraDialog({ pedido, onFechar, onFeito }) {
   const [selecionada, setSelecionada] = useState(pedido.transportadoraId ? { id: pedido.transportadoraId, nome: pedido.transportadoraNome } : null);
   const [obs, setObs] = useState(pedido.transportadoraObs || "");
@@ -713,6 +851,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
   const toast = useToast();
   const [dialogo, setDialogo] = useState(null);
   const [verId, setVerId] = useState(null);
+  const statusPag = useStatusPagamentos();
 
   const feito = (d, fechar = true) => {
     onAtualizado?.(d);
@@ -806,6 +945,12 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
             contexto === "vendas" && ativo && pedido.statusFinanceiro === "AGUARDANDO_PAGAMENTO" && financeiro && { label: "Registrar recebimento", icone: HandCoins, onClick: () => comCompleto("recebimento") },
             contexto === "vendas" && ativo && financeiro && { label: "Controle de parcelas", icone: ListChecks, onClick: () => comCompleto("parcelas") },
             contexto === "vendas" && ativo && financeiro && { label: "Alterar forma de pagamento", icone: CreditCard, onClick: () => comCompleto("forma") },
+            contexto === "vendas" && ativo && pedido.statusFinanceiro !== "PAGO" && statusPag?.maquininha?.habilitado && pode("VENDAS", "FINANCEIRO", "CHECKOUT") && {
+              label: "Cobrar na maquininha",
+              icone: Smartphone,
+              cor: "font-semibold text-blue-700 hover:bg-blue-50",
+              onClick: () => comCompleto("maquininha"),
+            },
             contexto === "vendas" && ativo && { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
             contexto === "vendas" && ativo && { label: "Nota fiscal", icone: FileText, onClick: () => comCompleto("nota") },
             contexto === "vendas" && ativo && pode("COMERCIAL", "FINANCEIRO", "VENDAS") && { label: "Custo pós-venda", icone: HandCoins, onClick: () => setDialogo({ nome: "custo", pedido }) },
@@ -819,6 +964,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
       <PedidoDetalhes pedidoId={verId} onFechar={() => setVerId(null)} />
       {dialogo?.nome === "liberar" && <LiberarDialog {...props} modo="liberar" />}
       {dialogo?.nome === "pagar" && <LiberarDialog {...props} modo="pagar" />}
+      {dialogo?.nome === "maquininha" && <MaquininhaDialog {...props} />}
       {dialogo?.nome === "recebimento" && <RecebimentoDialog {...props} />}
       {dialogo?.nome === "parcelas" && <ParcelasDialog {...props} />}
       {dialogo?.nome === "forma" && <FormaPagamentoDialog {...props} />}

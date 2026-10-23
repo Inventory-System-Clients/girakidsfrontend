@@ -61,7 +61,9 @@ function grupos(pode, usuario, alertasRecebimentos) {
     },
     {
       titulo: "Administração",
-      itens: [pode("USUARIOS") && { label: "Gerenciar Usuários", rota: "/usuarios" }],
+      itens: [
+        pode("USUARIOS") && { label: "Gerenciar Usuários", rota: "/usuarios" },
+      ],
     },
   ];
   return lista.map((g) => ({ ...g, itens: g.itens.filter(Boolean) })).filter((g) => g.itens.length);
