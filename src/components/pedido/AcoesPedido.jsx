@@ -875,11 +875,11 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
       confirmar: "Cancelar Pedido",
       cancelar: "Voltar",
       perigo: true,
-      campo: { label: "Motivo do cancelamento", obrigatorio: true },
+      campo: { label: "Motivo do cancelamento (opcional)" },
     });
-    if (!motivo) return;
+    if (motivo === false) return;
     try {
-      const { data: d } = await api.post(`/pedidos/${pedido.id}/cancelar`, { motivo });
+      const { data: d } = await api.post(`/pedidos/${pedido.id}/cancelar`, { motivo: typeof motivo === "string" ? motivo : "" });
       toast({ titulo: "Pedido cancelado com sucesso", descricao: "O pedido foi cancelado e o estoque foi restaurado quando necessário." });
       feito(d);
     } catch (error) {
