@@ -274,6 +274,9 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
             <Field label="Descrição do Item" obrigatorio className="sm:col-span-2">
               <Textarea value={p.descricao || ""} onChange={set("descricao")} />
             </Field>
+            <Field label="Vídeo demonstrativo (link do YouTube)" dica="Aparece no fim dos detalhes do produto no catálogo." className="sm:col-span-2">
+              <Input value={p.videoUrl || ""} onChange={set("videoUrl")} placeholder="https://www.youtube.com/watch?v=..." />
+            </Field>
           </div>
           {p.tipo === "COMPOSTO" && (
             <div className="mt-4 rounded-lg border border-border p-3">

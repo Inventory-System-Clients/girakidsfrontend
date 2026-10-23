@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Link2, Maximize2, Package, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
+import { Link2, Maximize2, Package, PlayCircle, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
 import api from "../services/api";
 import Carrossel from "../components/Carrossel";
 import BannerCarrossel, { useLayoutBanner } from "../components/BannerCarrossel";
@@ -262,8 +262,8 @@ export default function Catalogo() {
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <p className="text-sm text-muted-foreground">SKU {detalhe.sku}</p>
-              {detalhe.descricao && <p className="text-sm">{detalhe.descricao}</p>}
+              <p className="text-xs text-muted-foreground">SKU {detalhe.sku}</p>
+              <p className="text-lg font-semibold leading-tight">{detalhe.nome}</p>
               <p className="text-2xl font-bold text-primary">{moedaUnitaria(detalhe.precoVenda)}</p>
               {detalhe.unidadesPacote > 1 && (
                 <p className="text-sm text-muted-foreground">
@@ -272,7 +272,23 @@ export default function Catalogo() {
               )}
               {!detalhe.disponivel && <Badge variant="warning">Sem estoque no momento</Badge>}
               {detalhe.modoVenda === "ENCOMENDA" && <Badge variant="info">Por encomenda</Badge>}
-              <div className="mt-auto pt-4">
+              {detalhe.descricao && (
+                <div className="mt-2 border-t border-border pt-3">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Descrição</p>
+                  <p className="whitespace-pre-line text-sm">{detalhe.descricao}</p>
+                </div>
+              )}
+              <div className="mt-auto space-y-3 pt-4">
+                {detalhe.videoUrl && (
+                  <a
+                    href={detalhe.videoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                  >
+                    <PlayCircle className="h-5 w-5" /> Ver vídeo demonstrativo no YouTube
+                  </a>
+                )}
                 <Quantidade produto={detalhe} />
               </div>
             </div>
