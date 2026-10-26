@@ -4,7 +4,8 @@ import { Spinner } from "./ui";
 
 // permissoes: telas internas aceitas (ADMIN passa sempre). Sem permissões =
 // basta estar logado.
-export default function PrivateRoute({ permissoes, children }) {
+// semShowroom: o totem do showroom não abre a tela (ex.: perfil).
+export default function PrivateRoute({ permissoes, semShowroom, children }) {
   const { usuario, carregando, pode } = useAuth();
   const location = useLocation();
 
@@ -20,5 +21,6 @@ export default function PrivateRoute({ permissoes, children }) {
     return <Navigate to="/perfil" state={{ trocarSenha: true }} replace />;
   }
   if (permissoes?.length && !pode(...permissoes)) return <Navigate to="/" replace />;
+  if (semShowroom && usuario.role === "SHOWROOM" && !usuario.trocarSenha) return <Navigate to="/" replace />;
   return children;
 }

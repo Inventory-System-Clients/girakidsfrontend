@@ -151,7 +151,7 @@ export function EditorMescla({ linhas, onChange, total, formas }) {
 
 export default function Checkout({ modo = "pedido" }) {
   const orcamento = modo === "orcamento";
-  const { usuario, interno, atualizarUsuario } = useAuth();
+  const { usuario, interno, showroom, tiraPedido, atualizarUsuario } = useAuth();
   const { itens, definirQuantidade, definirPreco, limpar, subtotal } = useCart();
   const navigate = useNavigate();
   const toast = useToast();
@@ -160,14 +160,14 @@ export default function Checkout({ modo = "pedido" }) {
   // pelo catálogo (sessionStorage).
   const chaveCliente = `girakids_checkout_cliente_${modo}`;
   const [clienteSelecionado, setClienteSelecionado] = useState(() => {
-    if (!interno) return null;
+    if (!tiraPedido) return null;
     try {
       return JSON.parse(sessionStorage.getItem(chaveCliente) || "null");
     } catch {
       return null;
     }
   });
-  const [cliente, setCliente] = useState(() => (interno ? dadosDoUsuario(clienteSelecionado || {}) : dadosDoUsuario(usuario)));
+  const [cliente, setCliente] = useState(() => (tiraPedido ? dadosDoUsuario(clienteSelecionado || {}) : dadosDoUsuario(usuario)));
   const [clienteId, setClienteId] = useState(() => clienteSelecionado?.id || null);
   const [mostrarIA, setMostrarIA] = useState(false);
   const [transportadora, setTransportadora] = useState(null);
@@ -237,7 +237,7 @@ export default function Checkout({ modo = "pedido" }) {
   const config = opcoes?.formas?.find((f) => f.codigo === forma);
   // Maquininha integrada (SumUp, Stone ou Point): a equipe escolhe qual e o
   // pedido vai direto para a tela dela ao finalizar.
-  const maquininhaIntegrada = interno && !orcamento && forma === "MAQUININHA" && opcoes?.pagamentosOnline?.maquininha?.habilitado;
+  const maquininhaIntegrada = tiraPedido && !orcamento && forma === "MAQUININHA" && opcoes?.pagamentosOnline?.maquininha?.habilitado;
   const [maquininhas, setMaquininhas] = useState(null);
   const [maquininhaId, setMaquininhaId] = useState("");
   useEffect(() => {
@@ -263,7 +263,7 @@ export default function Checkout({ modo = "pedido" }) {
     if (!itens.length) return recusar("O carrinho está vazio");
     if (!orcamento && !metodoEnvio) return recusar("Selecione uma opção de entrega");
     if (!orcamento && !forma) return recusar("Selecione a forma de pagamento");
-    if (!cliente.nome) return recusar("Campos obrigatórios", interno ? "Escolha o cliente ou preencha os dados dele." : "Preencha os seus dados.");
+    if (!cliente.nome) return recusar("Campos obrigatórios", tiraPedido ? "Escolha o cliente ou preencha os dados dele." : "Preencha os seus dados.");
     // Maquininha: garante a lista carregada e escolhe sozinha se só houver uma.
     let maquininhaEscolhida = maquininhaId;
     if (maquininhaIntegrada && !maquininhaEscolhida) {
@@ -309,7 +309,9 @@ export default function Checkout({ modo = "pedido" }) {
           titulo: "Cliente cadastrado ✅",
           descricao: c.emailGerado
             ? "Os dados ficaram salvos para os próximos pedidos (sem e-mail informado, o cliente não entra no site)."
-            : `Login: ${c.email} · senha: ${c.senhaPadrao}. Da próxima vez os dados são preenchidos automaticamente.`,
+            : !c.senhaPadrao
+              ? "Os dados ficaram salvos para os próximos pedidos."
+              : `Login: ${c.email} · senha: ${c.senhaPadrao}. Da próxima vez os dados são preenchidos automaticamente.`,
         });
       };
       if (orcamento) {
@@ -321,7 +323,7 @@ export default function Checkout({ modo = "pedido" }) {
         escolherCliente(null);
       } else {
         const { data } = await api.post("/pedidos", corpo);
-        if (interno) avisarCadastro(data);
+        if (tiraPedido) avisarCadastro(data);
         // Envia a cobrança para a maquininha escolhida.
         if (maquininhaIntegrada && maquininhaEscolhida) {
           try {
@@ -332,7 +334,7 @@ export default function Checkout({ modo = "pedido" }) {
           }
         }
         limpar();
-        if (interno) escolherCliente(null);
+        if (tiraPedido) escolherCliente(null);
         if (usarCredito) api.get("/auth/perfil").then(({ data: u }) => atualizarUsuario(u)).catch(() => {});
         if (pedidoPeloGiraldo) avisarResultadoGiraldo({ ok: true, pedido: { id: data.id, numero: data.numeroFormatado, total: data.total, formaPagamento: data.formaPagamento } });
         navigate(`/pagamento/${data.id}`);
@@ -370,8 +372,8 @@ export default function Checkout({ modo = "pedido" }) {
         ...faltando,
         ...(maquininhaIntegrada && maquininhas?.length > 1 && !maquininhaId ? ["escolher a maquininha na tela"] : []),
       ],
-      equipe: interno,
-      clienteEscolhido: interno ? Boolean(clienteId) : true,
+      equipe: tiraPedido,
+      clienteEscolhido: tiraPedido ? Boolean(clienteId) : true,
       observacoes,
     });
   });
@@ -467,7 +469,7 @@ export default function Checkout({ modo = "pedido" }) {
     return (
       <div className="container-app py-8">
         <PageHeader titulo={orcamento ? "Geração de Orçamentos" : "Checkout"} subtitulo={orcamento ? "Monte pedidos administrativos, gere o PDF e salve o código para reaproveitar no checkout." : "Revise seu pedido e finalize a compra"}>
-          <CarregarPedido />
+          {!showroom && <CarregarPedido />}
         </PageHeader>
         <Card>
           <EmptyState
@@ -484,7 +486,7 @@ export default function Checkout({ modo = "pedido" }) {
     );
   }
 
-  const formasVisiveis = (opcoes?.formas || []).filter((f) => f.codigo !== "MESCLA" || interno);
+  const formasVisiveis = (opcoes?.formas || []).filter((f) => f.codigo !== "MESCLA" || tiraPedido);
 
   return (
     <div className="container-app py-8">
@@ -503,7 +505,7 @@ export default function Checkout({ modo = "pedido" }) {
                     <Sparkles className="h-4 w-4" /> Adicionar com IA
                   </Button>
                 )}
-                <CarregarPedido onCarregado={(p) => p.observacoes && setObservacoes(p.observacoes)} />
+                {!showroom && <CarregarPedido onCarregado={(p) => p.observacoes && setObservacoes(p.observacoes)} />}
               </div>
             </div>
             {interno && mostrarIA && (
@@ -573,18 +575,21 @@ export default function Checkout({ modo = "pedido" }) {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Informações de entrega</h2>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCliente(dadosDoUsuario(usuario))}>
-                  Preencher automaticamente
-                </Button>
+                {!showroom && (
+                  <Button variant="outline" size="sm" onClick={() => setCliente(dadosDoUsuario(usuario))}>
+                    Preencher automaticamente
+                  </Button>
+                )}
               </div>
             </div>
-            {interno && (
+            {tiraPedido && (
               <div className="mb-4">
                 {clienteSelecionado ? (
-                  <ClienteSelecionado cliente={clienteSelecionado} onTrocar={() => escolherCliente(null)} onAtualizar={escolherCliente} />
+                  <ClienteSelecionado cliente={clienteSelecionado} simples={showroom} onTrocar={() => escolherCliente(null)} onAtualizar={escolherCliente} />
                 ) : (
-                  <ClienteBusca onEscolher={escolherCliente} placeholder="Buscar cliente cadastrado (nome, e-mail, telefone ou CPF/CNPJ)..." />
+                  <ClienteBusca onEscolher={escolherCliente} semRecentes={showroom} placeholder="Buscar cliente cadastrado (nome, e-mail, telefone ou CPF/CNPJ)..." />
                 )}
+                {showroom && !clienteSelecionado && <p className="mt-1 text-xs text-muted-foreground">Cliente sem cadastro: preencha os dados abaixo que o cadastro é criado ao finalizar.</p>}
               </div>
             )}
             <EnderecoCampos valor={cliente} onChange={setCliente} obrigatorio={!orcamento} />
@@ -687,7 +692,7 @@ export default function Checkout({ modo = "pedido" }) {
                               : "Sem taxa"}
                       </span>
                     </span>
-                    {f.admin && <Badge variant="outline">ADM</Badge>}
+                    {f.admin && interno && <Badge variant="outline">ADM</Badge>}
                   </button>
                 );
               })}

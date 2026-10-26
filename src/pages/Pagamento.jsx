@@ -14,7 +14,7 @@ import { BotaoWhatsapp, useWhatsappComercial } from "../components/Whatsapp";
 // o QR Code/link do banco configurado e atualiza o status sozinha.
 export default function Pagamento() {
   const { id } = useParams();
-  const { interno } = useAuth();
+  const { interno, showroom } = useAuth();
   const toast = useToast();
   const [pedido, setPedido] = useState(null);
   const [erro, setErro] = useState("");
@@ -96,7 +96,7 @@ export default function Pagamento() {
             <Smartphone className="mx-auto h-10 w-10 animate-pulse text-blue-600" />
             <p className="mt-2 font-semibold text-blue-900">Aguardando o pagamento na maquininha...</p>
             <p className="text-sm text-blue-900">Assim que o cliente pagar, o pedido é confirmado e liberado sozinho.</p>
-            {interno && (
+            {(interno || showroom) && (
               <Button variant="danger-outline" size="sm" className="mt-3" onClick={cancelarMaquininha}>
                 Cancelar cobrança na maquininha
               </Button>
@@ -165,11 +165,13 @@ export default function Pagamento() {
           <Button variant="outline" onClick={() => gerarPdfPedido(pedido)}>
             <FileDown className="h-4 w-4" /> Baixar Comprovante (PDF)
           </Button>
-          <Link to={interno ? "/historico-pedidos" : "/meus-pedidos"}>
-            <Button variant="ghost" className="w-full">
-              {interno ? "Ir para o histórico de pedidos" : "Ver meus pedidos"}
-            </Button>
-          </Link>
+          {!showroom && (
+            <Link to={interno ? "/historico-pedidos" : "/meus-pedidos"}>
+              <Button variant="ghost" className="w-full">
+                {interno ? "Ir para o histórico de pedidos" : "Ver meus pedidos"}
+              </Button>
+            </Link>
+          )}
           <Link to="/">
             <Button variant="ghost" className="w-full">
               Voltar para o catálogo

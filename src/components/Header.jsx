@@ -23,7 +23,7 @@ function grupos(pode, usuario, alertasRecebimentos) {
     {
       titulo: "Conta",
       itens: [
-        { label: "Meu Perfil", rota: "/perfil" },
+        usuario?.role !== "SHOWROOM" && { label: "Meu Perfil", rota: "/perfil" },
         usuario?.role === "CLIENTE" && { label: "Meus Pedidos", rota: "/meus-pedidos" },
       ],
     },

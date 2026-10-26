@@ -35,7 +35,7 @@ const CalculadoraPedidos = lazy(() => import("./pages/comercial/CalculadoraPedid
 const PedidosNotasFiscais = lazy(() => import("./pages/comercial/PedidosNotasFiscais").then((m) => ({ default: m.PedidosNotasFiscais })));
 const Correios = lazy(() => import("./pages/comercial/Correios").then((m) => ({ default: m.Correios })));
 
-const Protegida = ({ permissoes, children }) => <PrivateRoute permissoes={permissoes}>{children}</PrivateRoute>;
+const Protegida = ({ permissoes, semShowroom, children }) => <PrivateRoute permissoes={permissoes} semShowroom={semShowroom}>{children}</PrivateRoute>;
 
 // Giraldo aparece para clientes e visitantes em todo o site; para a equipe,
 // só no catálogo, no carrinho e no pedido recém-finalizado (nas telas internas atrapalharia).
@@ -85,8 +85,8 @@ export default function App() {
                   <Route path="/registrar" element={<Registrar />} />
                   <Route path="/checkout" element={<Protegida><Checkout /></Protegida>} />
                   <Route path="/pagamento/:id" element={<Protegida><Pagamento /></Protegida>} />
-                  <Route path="/meus-pedidos" element={<Protegida><MeusPedidos /></Protegida>} />
-                  <Route path="/perfil" element={<Protegida><Perfil /></Protegida>} />
+                  <Route path="/meus-pedidos" element={<Protegida semShowroom><MeusPedidos /></Protegida>} />
+                  <Route path="/perfil" element={<Protegida semShowroom><Perfil /></Protegida>} />
                   <Route path="/dashboard" element={<Protegida permissoes={["FINANCEIRO"]}><Dashboard /></Protegida>} />
                   <Route path="/historico-pedidos" element={<Protegida permissoes={["VENDAS"]}><HistoricoPedidos /></Protegida>} />
                   <Route path="/expedicao" element={<Protegida permissoes={["EXPEDICAO"]}><Expedicao /></Protegida>} />

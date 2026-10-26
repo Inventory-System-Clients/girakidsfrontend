@@ -12,19 +12,21 @@ const paraCarrinho = (itens) =>
   itens.filter((i) => i.produto && i.disponivel !== false).map((i) => ({ produto: i.produto, quantidade: i.quantidade, precoUnitario: null }));
 
 // Cartão do cliente escolhido (etiquetas, observação, WhatsApp, trocar).
-export function ClienteSelecionado({ cliente, onTrocar, onAtualizar }) {
+// simples: totem do showroom — só nome, contato e "Trocar cliente".
+export function ClienteSelecionado({ cliente, onTrocar, onAtualizar, simples }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary-soft/60 p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-1.5 font-semibold">
-          {cliente.nome} <EtiquetasChips etiquetas={cliente.etiquetas} />
-          <EditorEtiquetas clienteId={cliente.id} etiquetas={cliente.etiquetas || []} observacao={cliente.observacaoComercial} onSalvo={(d) => onAtualizar?.({ ...cliente, ...d })} />
+          {cliente.nome}
+          {!simples && <EtiquetasChips etiquetas={cliente.etiquetas} />}
+          {!simples && <EditorEtiquetas clienteId={cliente.id} etiquetas={cliente.etiquetas || []} observacao={cliente.observacaoComercial} onSalvo={(d) => onAtualizar?.({ ...cliente, ...d })} />}
         </p>
         <p className="truncate text-xs text-muted-foreground">{[cliente.email, cliente.telefone, cliente.cidade && `${cliente.cidade}/${cliente.estado || ""}`].filter(Boolean).join(" · ")}</p>
-        {cliente.observacaoComercial && <p className="mt-1 text-xs text-amber-900">Obs.: {cliente.observacaoComercial}</p>}
+        {!simples && cliente.observacaoComercial && <p className="mt-1 text-xs text-amber-900">Obs.: {cliente.observacaoComercial}</p>}
       </div>
       <div className="flex shrink-0 gap-2">
-        {cliente.telefone && (
+        {!simples && cliente.telefone && (
           <BotaoWhatsapp telefone={cliente.telefone} variante="contorno" className="py-1.5 text-xs" texto={`Olá ${cliente.nome.split(" ")[0]}! Aqui é da Gira Kids.`}>
             WhatsApp
           </BotaoWhatsapp>

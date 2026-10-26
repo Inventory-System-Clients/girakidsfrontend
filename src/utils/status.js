@@ -81,6 +81,7 @@ export const ROLES = {
   ADMIN: "Administrador",
   FUNCIONARIO: "Funcionário",
   CLIENTE: "Cliente",
+  SHOWROOM: "Showroom (totem)",
 };
 
 // Cor da linha na tabela de pedidos (como na loja original).

@@ -87,6 +87,7 @@ function UsuarioForm({ usuario, onFechar, onSalvo }) {
     ADMIN: "Acesso total a todas as telas internas.",
     FUNCIONARIO: "Acesso interno configurável: o administrador define quais telas este funcionário pode acessar.",
     CLIENTE: "Acesso limitado: visualiza catálogo, faz pedidos e acompanha seus pedidos.",
+    SHOWROOM: "Totem da loja: só tira pedidos para clientes cadastrados (busca ou cadastra o cliente) com as formas do cliente + maquininha, link, PIX presencial, a receber e mescla. Sem nenhuma tela administrativa e sem alterar o próprio perfil.",
   };
 
   return (

@@ -72,6 +72,9 @@ export function AuthProvider({ children }) {
   };
 
   const interno = usuario?.role === "ADMIN" || usuario?.role === "FUNCIONARIO";
+  // Totem do showroom: tira pedidos para clientes, sem telas internas.
+  const showroom = usuario?.role === "SHOWROOM";
+  const tiraPedido = interno || showroom;
   const pode = useCallback(
     (...permissoes) => {
       if (!usuario) return false;
@@ -84,7 +87,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ usuario, carregando, login, registrar, logout, atualizarUsuario, interno, pode }}
+      value={{ usuario, carregando, login, registrar, logout, atualizarUsuario, interno, showroom, tiraPedido, pode }}
     >
       {children}
     </AuthContext.Provider>

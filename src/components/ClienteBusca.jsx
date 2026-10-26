@@ -26,7 +26,9 @@ const cache = new Map();
 
 // Busca de cliente rápida: digita nome, e-mail, telefone ou CPF/CNPJ; setas
 // + Enter escolhem. Mostra os clientes recentes ao focar sem texto.
-export default function ClienteBusca({ onEscolher, autoFocus, placeholder = "Buscar cliente por nome, e-mail, telefone ou CPF/CNPJ..." }) {
+// semRecentes: no totem do showroom não mostra nem guarda clientes recentes.
+export default function ClienteBusca({ onEscolher, autoFocus, semRecentes, placeholder = "Buscar cliente por nome, e-mail, telefone ou CPF/CNPJ..." }) {
+  const recentes = () => (semRecentes ? [] : lerRecentes());
   const [busca, setBusca] = useState("");
   const [lista, setLista] = useState([]);
   const [carregando, setCarregando] = useState(false);
@@ -36,8 +38,8 @@ export default function ClienteBusca({ onEscolher, autoFocus, placeholder = "Bus
 
   useEffect(() => {
     const termo = busca.trim();
-    if (termo.length < 2) {
-      setLista(lerRecentes());
+    if (termo.length < (semRecentes ? 3 : 2)) {
+      setLista(semRecentes ? [] : lerRecentes());
       setCarregando(false);
       return undefined;
     }
@@ -60,10 +62,10 @@ export default function ClienteBusca({ onEscolher, autoFocus, placeholder = "Bus
         .finally(() => setCarregando(false));
     }, 180);
     return () => clearTimeout(t);
-  }, [busca]);
+  }, [busca, semRecentes]);
 
   const escolher = (c) => {
-    guardarRecente(c);
+    if (!semRecentes) guardarRecente(c);
     setBusca("");
     setAberto(false);
     onEscolher(c);
@@ -79,7 +81,7 @@ export default function ClienteBusca({ onEscolher, autoFocus, placeholder = "Bus
         autoFocus={autoFocus}
         onFocus={() => {
           setAberto(true);
-          if (!busca) setLista(lerRecentes());
+          if (!busca) setLista(recentes());
         }}
         onBlur={() => setTimeout(() => setAberto(false), 150)}
         onChange={(e) => {
