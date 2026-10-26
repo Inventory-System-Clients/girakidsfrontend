@@ -59,21 +59,56 @@ function GaleriaImagens({ imagens, onChange, desabilitado }) {
       }
     }
   };
-  const mover = (i, delta) => {
+  const moverPara = (de, para) => {
+    if (de === para || de == null || para == null) return;
     const nova = [...imagens];
-    const [item] = nova.splice(i, 1);
-    nova.splice(i + delta, 0, item);
+    const [item] = nova.splice(de, 1);
+    nova.splice(para, 0, item);
     onChange(nova);
+  };
+  const mover = (i, delta) => moverPara(i, i + delta);
+  // Arrastar uma imagem sobre outra muda a ordem (as setas seguem valendo no celular).
+  const [arrastando, setArrastando] = useState(null);
+  const [sobre, setSobre] = useState(null);
+  const soltar = () => {
+    moverPara(arrastando, sobre);
+    setArrastando(null);
+    setSobre(null);
   };
 
   return (
     <div>
       <p className="label">Imagens do produto (carrossel)</p>
-      <p className="mb-2 text-xs text-muted-foreground">A primeira imagem é a capa no catálogo. Arraste várias de uma vez; use as setas para reordenar.</p>
+      <p className="mb-2 text-xs text-muted-foreground">A primeira imagem é a capa no catálogo. Arraste as imagens para mudar a ordem (ou use as setas). Para adicionar, arraste várias de uma vez para o quadro tracejado.</p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {imagens.map((url, i) => (
-          <div key={url} className="group relative overflow-hidden rounded-lg border border-border bg-muted">
-            <img src={url} alt="" className="aspect-square w-full object-cover" />
+          <div
+            key={url}
+            draggable={!desabilitado}
+            onDragStart={(e) => {
+              setArrastando(i);
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", String(i));
+            }}
+            onDragEnter={() => arrastando != null && setSobre(i)}
+            onDragOver={(e) => arrastando != null && e.preventDefault()}
+            onDrop={(e) => {
+              if (arrastando == null) return;
+              e.preventDefault();
+              soltar();
+            }}
+            onDragEnd={() => {
+              setArrastando(null);
+              setSobre(null);
+            }}
+            title="Arraste para mudar a ordem"
+            className={cx(
+              "group relative cursor-grab overflow-hidden rounded-lg border border-border bg-muted transition active:cursor-grabbing",
+              arrastando === i && "opacity-40",
+              sobre === i && arrastando !== i && "ring-2 ring-primary ring-offset-2",
+            )}
+          >
+            <img src={url} alt="" draggable={false} className="pointer-events-none aspect-square w-full object-cover select-none" />
             {i === 0 && <span className="absolute top-1 left-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-white">Capa</span>}
             <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-1 text-white">
               <button type="button" className="rounded px-1.5 hover:bg-white/20 disabled:opacity-30" disabled={i === 0} onClick={() => mover(i, -1)} aria-label="Mover para a esquerda">
