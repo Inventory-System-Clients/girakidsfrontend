@@ -14,10 +14,10 @@ const NOMES_ENTREGA = { RETIRAR_LOCAL: "Retirar na loja", TRANSPORTADORA: "Trans
 
 // Resumo do que está na tela do carrinho e o próximo passo.
 const resumoCarrinho = (tela) => {
-  if (!tela) return { content: "Estamos no seu carrinho 🛒 Eu escolho a entrega, o pagamento e preencho os dados com você. Como você quer receber?", sugestoes: ["Retirar na loja", "Correios (PAC/SEDEX)", "Transportadora"] };
+  if (!tela) return { content: "Estamos no carrinho. Como prefere receber o pedido?", sugestoes: ["Retirar na loja", "Correios (PAC/SEDEX)", "Transportadora"] };
   const pagamento = tela.formasDisponiveis?.find((f) => f.codigo === tela.formaPagamento)?.nome || tela.formaPagamento;
   const linhas = [
-    "Estamos no carrinho 🛒 Confira na tela:",
+    "Estamos no carrinho. Resumo da tela:",
     `• Entrega: ${tela.metodoEnvio ? NOMES_ENTREGA[tela.metodoEnvio] || tela.metodoEnvio : "falta escolher"}`,
     `• Pagamento: ${pagamento || "falta escolher"}`,
     `• Total: ${moeda(tela.total)}`,
@@ -25,7 +25,7 @@ const resumoCarrinho = (tela) => {
   if (tela.equipe && !tela.clienteEscolhido) linhas.push("• Falta escolher o cliente (busque no topo da tela).");
   if (tela.dadosFaltando?.length) linhas.push(`• Falta preencher: ${tela.dadosFaltando.join(", ")}.`);
   const pronto = tela.metodoEnvio && tela.formaPagamento && !tela.dadosFaltando?.length && (!tela.equipe || tela.clienteEscolhido);
-  linhas.push(pronto ? "Está tudo certo. Posso finalizar?" : !tela.metodoEnvio ? "Como você quer receber?" : !tela.formaPagamento ? "Como quer pagar?" : "Me passa o que falta que eu preencho 😉");
+  linhas.push(pronto ? "Está tudo certo. Posso finalizar?" : !tela.metodoEnvio ? "Como prefere receber o pedido?" : !tela.formaPagamento ? "Qual a forma de pagamento?" : "Me informe o que falta e eu preencho para você.");
   const sugestoes = pronto
     ? ["Pode finalizar", "Mudar o pagamento"]
     : !tela.metodoEnvio
@@ -68,8 +68,8 @@ const BALAO_INTERVALO_MS = 45000;
 
 const BOAS_VINDAS = {
   role: "assistant",
-  content: "Olá! Eu sou o Giraldo 😊 Me conta o que você quer comprar — pode digitar ou tocar no microfone e falar.",
-  sugestoes: ["Bolinhas pula-pula", "Brinquedos encapsulados", "Pelúcias", "Ver meu carrinho"],
+  content: "Olá! Sou o Giraldo, assistente de compras da Gira Kids. Diga o produto e a quantidade que você procura — pode digitar ou falar no microfone.",
+  sugestoes: ["Bolinhas pula-pula", "Brinquedos encapsulados", "Cápsulas", "Ver meu carrinho"],
 };
 
 // Escolhas que o Giraldo já fez com o cliente (o checkout aproveita).
@@ -237,7 +237,7 @@ export default function Giraldo() {
   // (estado só em memória).
   const [balao, setBalao] = useState(false);
   const noCarrinho = local.pathname === "/checkout";
-  const textoBalao = noCarrinho && cart.itens.length ? "Quer ajuda para finalizar? Eu escolho a entrega e o pagamento com você 😊" : "Posso te ajudar com a sua compra? 😊";
+  const textoBalao = noCarrinho && cart.itens.length ? "Posso ajudar a finalizar? Eu preencho a entrega e o pagamento com você." : "Posso te ajudar a encontrar os produtos? 😊";
   // Finalização pedida pelo Giraldo: ao cair na tela do pedido, ele avisa.
   const finalizandoRef = useRef(false);
   // Mudança de tela feita pelo próprio Giraldo (ele já explicou na resposta).
@@ -361,7 +361,7 @@ export default function Giraldo() {
             sugestoes: ["Quero comprar mais", "Ver meus pedidos"],
           });
         } else {
-          adicionarMensagem({ role: "assistant", content: `Ainda não deu para finalizar: ${r.motivo}. Me fala o que falta que eu ajusto, ou complete na tela 😉` });
+          adicionarMensagem({ role: "assistant", content: `Ainda não foi possível finalizar: ${r.motivo}. Me informe o que falta e eu ajusto, ou complete direto na tela.` });
         }
       }),
     [],
@@ -391,14 +391,18 @@ export default function Giraldo() {
         if (!balaoDispensado) setBalao(true);
         return;
       }
-      setMensagens((lista) => {
-        const ultima = lista[lista.length - 1];
-        if (ultima?.role === "assistant" && ultima.noCarrinho) return lista;
-        const tela = lerCheckout();
-        const sugestoes = !tela?.metodoEnvio ? ["Retirar na loja", "Correios (PAC/SEDEX)", "Transportadora"] : !tela?.formaPagamento ? ["PIX", "Cartão de crédito", "Combinar com o comercial"] : ["Pode finalizar", "Mudar a entrega"];
-        return [...lista, { role: "assistant", content: "Estamos no seu carrinho 🛒 Eu posso escolher a entrega, o pagamento e preencher os dados com você. Como você quer receber?", sugestoes, noCarrinho: true }];
-      });
+      const t = setTimeout(
+        () =>
+          setMensagens((lista) => {
+            const ultima = lista[lista.length - 1];
+            if (ultima?.role === "assistant" && ultima.noCarrinho) return lista;
+            return [...lista, { role: "assistant", ...resumoCarrinho(lerCheckout()), noCarrinho: true }];
+          }),
+        1500,
+      );
+      return () => clearTimeout(t);
     }
+    return undefined;
   }, [local.pathname, aberto, balaoDispensado]);
 
   const enviar = async (conteudo) => {
