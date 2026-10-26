@@ -37,3 +37,13 @@ export const ouvirComandosGiraldo = (fn) => {
     estadoCheckout = null;
   };
 };
+
+// Volta do carrinho para o Giraldo: resultado do "finalizar" pedido por ele
+// ({ ok: true, pedido } ou { ok: false, motivo }).
+export const avisarResultadoGiraldo = (resultado) => alvo.dispatchEvent(new CustomEvent("resultado", { detail: resultado }));
+
+export const ouvirResultadoCheckout = (fn) => {
+  const handler = (e) => fn(e.detail);
+  alvo.addEventListener("resultado", handler);
+  return () => alvo.removeEventListener("resultado", handler);
+};

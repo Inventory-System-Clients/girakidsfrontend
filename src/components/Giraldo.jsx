@@ -8,7 +8,41 @@ import { useCart } from "../contexts/CartContext";
 import { cx } from "./ui";
 import { BotaoWhatsapp } from "./Whatsapp";
 import { moeda, moedaUnitaria } from "../utils/format";
-import { lerCheckout, pedirAoCheckout } from "../utils/giraldoPonte";
+import { lerCheckout, ouvirResultadoCheckout, pedirAoCheckout } from "../utils/giraldoPonte";
+
+const NOMES_ENTREGA = { RETIRAR_LOCAL: "Retirar na loja", TRANSPORTADORA: "Transportadora", PAC: "Correios PAC", SEDEX: "Correios SEDEX" };
+
+// Resumo do que está na tela do carrinho e o próximo passo.
+const resumoCarrinho = (tela) => {
+  if (!tela) return { content: "Estamos no seu carrinho 🛒 Eu escolho a entrega, o pagamento e preencho os dados com você. Como você quer receber?", sugestoes: ["Retirar na loja", "Correios (PAC/SEDEX)", "Transportadora"] };
+  const pagamento = tela.formasDisponiveis?.find((f) => f.codigo === tela.formaPagamento)?.nome || tela.formaPagamento;
+  const linhas = [
+    "Estamos no carrinho 🛒 Confira na tela:",
+    `• Entrega: ${tela.metodoEnvio ? NOMES_ENTREGA[tela.metodoEnvio] || tela.metodoEnvio : "falta escolher"}`,
+    `• Pagamento: ${pagamento || "falta escolher"}`,
+    `• Total: ${moeda(tela.total)}`,
+  ];
+  if (tela.equipe && !tela.clienteEscolhido) linhas.push("• Falta escolher o cliente (busque no topo da tela).");
+  if (tela.dadosFaltando?.length) linhas.push(`• Falta preencher: ${tela.dadosFaltando.join(", ")}.`);
+  const pronto = tela.metodoEnvio && tela.formaPagamento && !tela.dadosFaltando?.length && (!tela.equipe || tela.clienteEscolhido);
+  linhas.push(pronto ? "Está tudo certo. Posso finalizar?" : !tela.metodoEnvio ? "Como você quer receber?" : !tela.formaPagamento ? "Como quer pagar?" : "Me passa o que falta que eu preencho 😉");
+  const sugestoes = pronto
+    ? ["Pode finalizar", "Mudar o pagamento"]
+    : !tela.metodoEnvio
+      ? ["Retirar na loja", "Correios (PAC/SEDEX)", "Transportadora"]
+      : !tela.formaPagamento
+        ? (tela.formasDisponiveis || []).slice(0, 4).map((f) => f.nome)
+        : [];
+  return { content: linhas.join("\n"), sugestoes };
+};
+
+const MENSAGEM_PAGAMENTO = {
+  PIX_ONLINE: "O QR Code do PIX já está na tela: é só escanear ou copiar o código. Quando o banco confirmar, o pedido é liberado sozinho.",
+  CREDITO_ONLINE: "Toque em \"Pagar com cartão\" na tela para pagar no site do banco.",
+  DEBITO_ONLINE: "Toque em \"Pagar com cartão\" na tela para pagar no site do banco.",
+  MAQUININHA: "A cobrança foi enviada para a maquininha. Assim que pagar nela, o pedido é confirmado sozinho.",
+  CREDITO_LINK: "Fale com o comercial no WhatsApp para receber o link do cartão.",
+};
 
 const CHAVE_CONVERSA = "girakids_giraldo_conversa";
 const CHAVE_ESTADO = "girakids_giraldo_estado";
@@ -246,7 +280,13 @@ export default function Giraldo() {
     };
   }, [aberto, balaoDispensado]);
 
-  const adicionarMensagem = (m) => setMensagens((lista) => [...lista, m]);
+  // Grava na hora: o Giraldo pode sumir da tela logo em seguida (troca de página).
+  const adicionarMensagem = (m) =>
+    setMensagens((lista) => {
+      const nova = [...lista, m];
+      gravar(CHAVE_CONVERSA, nova.slice(-40));
+      return nova;
+    });
 
   // Ações que o Giraldo manda: carrinho, escolhas na tela do carrinho
   // (aplicadas ao vivo pela ponte com o checkout) e navegação.
@@ -293,31 +333,58 @@ export default function Giraldo() {
           adicionarMensagem({ role: "assistant", content: "Para finalizar, entre na sua conta ou crie uma rapidinho. Seu carrinho fica guardado 😉", login: true });
           continue;
         }
-        // Finaliza pela tela do carrinho (mesmas conferências do botão).
-        finalizandoRef.current = true;
-        irPara("/checkout");
-        pedirAoCheckout({ tipo: "finalizar" });
+        if (window.location.pathname !== "/checkout") {
+          // Fora do carrinho: só leva até lá; o cliente confere e confirma.
+          irPara("/checkout");
+          resumoAoChegarRef.current = true;
+        } else {
+          // No carrinho: aperta o botão de finalizar da tela (mesmas conferências).
+          finalizandoRef.current = true;
+          pedirAoCheckout({ tipo: "finalizar" });
+        }
       }
     }
     setEstado(novoEstado);
   };
 
-  // Mudou de tela: no carrinho o Giraldo se oferece para ajudar; depois de
-  // finalizar, avisa que o pedido foi criado.
+  // Resultado do "finalizar" feito pelo Giraldo na tela do carrinho.
+  useEffect(
+    () =>
+      ouvirResultadoCheckout((r) => {
+        if (!finalizandoRef.current) return;
+        finalizandoRef.current = false;
+        if (r.ok) {
+          setEstado({});
+          adicionarMensagem({
+            role: "assistant",
+            content: `Pronto! 🎉 Pedido nº ${r.pedido.numero} criado (${moeda(r.pedido.total)}). ${MENSAGEM_PAGAMENTO[r.pedido.formaPagamento] || "Os dados do pedido estão na tela."}`,
+            sugestoes: ["Quero comprar mais", "Ver meus pedidos"],
+          });
+        } else {
+          adicionarMensagem({ role: "assistant", content: `Ainda não deu para finalizar: ${r.motivo}. Me fala o que falta que eu ajusto, ou complete na tela 😉` });
+        }
+      }),
+    [],
+  );
+
+  // Mudou de tela: no carrinho o Giraldo se oferece para ajudar (ou mostra o
+  // resumo quando foi ele que trouxe a pessoa para finalizar).
+  const resumoAoChegarRef = useRef(false);
   const paginaAnterior = useRef(local.pathname);
   useEffect(() => {
     const anterior = paginaAnterior.current;
     paginaAnterior.current = local.pathname;
     if (anterior === local.pathname) return;
-    if (local.pathname.startsWith("/pagamento/") && finalizandoRef.current) {
-      finalizandoRef.current = false;
-      setEstado({});
-      setMensagens((lista) => [...lista, { role: "assistant", content: "Pronto! 🎉 Seu pedido foi criado. Aqui embaixo estão os dados para pagamento. Posso ajudar em mais alguma coisa?", sugestoes: ["Quero comprar mais", "Ver meus pedidos"] }]);
-      return;
+    if (local.pathname === "/checkout" && resumoAoChegarRef.current) {
+      resumoAoChegarRef.current = false;
+      navegouRef.current = false;
+      // Espera a tela publicar entrega, pagamento e frete.
+      const t = setTimeout(() => setMensagens((lista) => [...lista, { role: "assistant", ...resumoCarrinho(lerCheckout()), noCarrinho: true }]), 1500);
+      return () => clearTimeout(t);
     }
     if (navegouRef.current) {
       navegouRef.current = false;
-      return;
+      return undefined;
     }
     if (local.pathname === "/checkout" && carrinhoRef.current.length) {
       if (!aberto) {

@@ -27,7 +27,7 @@ import { ClienteSelecionado, HistoricoCliente, MontarComIA } from "../components
 import { lerEscolhasGiraldo } from "../components/Giraldo";
 import SeletorTransportadora from "../components/checkout/SeletorTransportadora";
 import { buscarCep, hojeISO, lerNumero, moeda, moedaUnitaria, somenteDigitos } from "../utils/format";
-import { ouvirComandosGiraldo, publicarCheckout } from "../utils/giraldoPonte";
+import { avisarResultadoGiraldo, ouvirComandosGiraldo, publicarCheckout } from "../utils/giraldoPonte";
 import { FORMAS_PAGAMENTO } from "../utils/status";
 import { gerarPdfPedido } from "../utils/pdf";
 
@@ -254,12 +254,31 @@ export default function Checkout({ modo = "pedido" }) {
   const taxas = Math.round(base * percentual) / 100;
   const total = base + taxas;
 
-  const enviar = async () => {
-    if (!itens.length) return;
-    if (!orcamento && !metodoEnvio) return toast({ titulo: "Selecione uma opção de entrega", tipo: "aviso" });
-    if (!orcamento && !forma) return toast({ titulo: "Selecione a forma de pagamento", tipo: "aviso" });
-    if (!cliente.nome) return toast({ titulo: "Campos obrigatórios", descricao: "Preencha os dados do cliente.", tipo: "aviso" });
-    if (maquininhaIntegrada && maquininhas?.length && !maquininhaId) return toast({ titulo: "Escolha a maquininha", descricao: "O pedido vai para a tela dela ao finalizar.", tipo: "aviso" });
+  // pedidoPeloGiraldo: o resultado volta para a conversa do Giraldo.
+  const enviar = async (pedidoPeloGiraldo = false) => {
+    const recusar = (titulo, descricao) => {
+      toast({ titulo, descricao, tipo: "aviso" });
+      if (pedidoPeloGiraldo) avisarResultadoGiraldo({ ok: false, motivo: [titulo, descricao].filter(Boolean).join(" — ") });
+    };
+    if (!itens.length) return recusar("O carrinho está vazio");
+    if (!orcamento && !metodoEnvio) return recusar("Selecione uma opção de entrega");
+    if (!orcamento && !forma) return recusar("Selecione a forma de pagamento");
+    if (!cliente.nome) return recusar("Campos obrigatórios", interno ? "Escolha o cliente ou preencha os dados dele." : "Preencha os seus dados.");
+    // Maquininha: garante a lista carregada e escolhe sozinha se só houver uma.
+    let maquininhaEscolhida = maquininhaId;
+    if (maquininhaIntegrada && !maquininhaEscolhida) {
+      let lista = maquininhas;
+      if (!lista) {
+        lista = await api.get("/pagamentos/maquininhas").then(({ data }) => data).catch(() => []);
+        setMaquininhas(lista);
+      }
+      if (lista.length === 1) {
+        maquininhaEscolhida = lista[0].id;
+        setMaquininhaId(maquininhaEscolhida);
+      } else if (lista.length > 1) {
+        return recusar("Escolha a maquininha", "O pedido vai para a tela dela ao finalizar.");
+      }
+    }
     setEnviando(true);
     try {
       const corpo = {
@@ -304,9 +323,9 @@ export default function Checkout({ modo = "pedido" }) {
         const { data } = await api.post("/pedidos", corpo);
         if (interno) avisarCadastro(data);
         // Envia a cobrança para a maquininha escolhida.
-        if (maquininhaIntegrada && maquininhaId) {
+        if (maquininhaIntegrada && maquininhaEscolhida) {
           try {
-            await api.post(`/pagamentos/pedidos/${data.id}/maquininha`, { maquininhaId });
+            await api.post(`/pagamentos/pedidos/${data.id}/maquininha`, { maquininhaId: maquininhaEscolhida });
             toast({ titulo: "Cobrança enviada para a maquininha", descricao: "Peça para o cliente pagar nela; o pedido é confirmado sozinho." });
           } catch (error) {
             toast({ titulo: "Pedido salvo, mas a maquininha não recebeu", descricao: `${mensagemErro(error)} Envie de novo pela tela do pedido.`, tipo: "aviso" });
@@ -315,10 +334,12 @@ export default function Checkout({ modo = "pedido" }) {
         limpar();
         if (interno) escolherCliente(null);
         if (usarCredito) api.get("/auth/perfil").then(({ data: u }) => atualizarUsuario(u)).catch(() => {});
+        if (pedidoPeloGiraldo) avisarResultadoGiraldo({ ok: true, pedido: { id: data.id, numero: data.numeroFormatado, total: data.total, formaPagamento: data.formaPagamento } });
         navigate(`/pagamento/${data.id}`);
       }
     } catch (error) {
       toast({ titulo: orcamento ? "Erro ao criar orçamento" : "Erro ao finalizar pedido", descricao: mensagemErro(error), tipo: "erro" });
+      if (pedidoPeloGiraldo) avisarResultadoGiraldo({ ok: false, motivo: mensagemErro(error) });
     } finally {
       setEnviando(false);
     }
@@ -345,7 +366,12 @@ export default function Checkout({ modo = "pedido" }) {
       subtotal,
       frete: valorFrete,
       total,
-      dadosFaltando: faltando,
+      dadosFaltando: [
+        ...faltando,
+        ...(maquininhaIntegrada && maquininhas?.length > 1 && !maquininhaId ? ["escolher a maquininha na tela"] : []),
+      ],
+      equipe: interno,
+      clienteEscolhido: interno ? Boolean(clienteId) : true,
       observacoes,
     });
   });
@@ -364,7 +390,7 @@ export default function Checkout({ modo = "pedido" }) {
         if (endereco) setCliente((atual) => ({ ...atual, cep, rua: endereco.rua || atual.rua, bairro: endereco.bairro || atual.bairro, cidade: endereco.cidade || atual.cidade, estado: endereco.estado || atual.estado }));
       } else if (c.tipo === "finalizar") {
         // Dá tempo das escolhas acima entrarem na tela antes de finalizar.
-        setTimeout(() => enviarRef.current?.(), 300);
+        setTimeout(() => enviarRef.current?.(true), 400);
       }
     });
   }, [orcamento]);
@@ -725,7 +751,7 @@ export default function Checkout({ modo = "pedido" }) {
               <span>Total</span>
               <span className="text-primary">{moeda(total)}</span>
             </div>
-            <Button variant={orcamento ? "primary" : "success"} size="lg" className="mt-3 w-full" loading={enviando} onClick={enviar}>
+            <Button variant={orcamento ? "primary" : "success"} size="lg" className="mt-3 w-full" loading={enviando} onClick={() => enviar()}>
               {orcamento ? (enviando ? "Salvando orçamento..." : "Salvar orçamento e gerar PDF") : "Finalizar Pedido"}
             </Button>
             {!orcamento && !metodoEnvio && <p className="text-center text-xs text-muted-foreground">Selecione uma opção de entrega</p>}
