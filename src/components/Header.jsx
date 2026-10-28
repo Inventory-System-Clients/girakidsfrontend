@@ -63,6 +63,7 @@ function grupos(pode, usuario, alertasRecebimentos) {
       itens: [
         pode("USUARIOS") && { label: "Gerenciar Usuários", rota: "/usuarios" },
         usuario?.role === "ADMIN" && { label: "💬 Avisos no WhatsApp", rota: "/whatsapp-avisos" },
+        usuario?.role === "ADMIN" && { label: "🔄 Sistema antigo (Krion)", rota: "/sistema-antigo" },
       ],
     },
   ];
