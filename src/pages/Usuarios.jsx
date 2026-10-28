@@ -136,6 +136,15 @@ function UsuarioForm({ usuario, onFechar, onSalvo }) {
               <Field label="Outros pagamentos" dica="Libera boleto, dinheiro e cheque no checkout do cliente.">
                 <Switch checked={u.outrosPagamentos} onChange={(v) => setU({ ...u, outrosPagamentos: v })} label={u.outrosPagamentos ? "Habilitado" : "Desabilitado"} />
               </Field>
+              {!novo && (
+                <Field label="Avisos no WhatsApp" dica="Pedido recebido, pronto e a caminho. O cliente também desliga respondendo SAIR no WhatsApp.">
+                  <Switch
+                    checked={u.whatsappAvisos !== false}
+                    onChange={(v) => setU({ ...u, whatsappAvisos: v })}
+                    label={u.whatsappAvisos !== false ? "Recebe os avisos" : "Não recebe (pediu para sair)"}
+                  />
+                </Field>
+              )}
             </>
           )}
           {!novo && (

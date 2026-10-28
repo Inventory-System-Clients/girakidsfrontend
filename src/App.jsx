@@ -28,6 +28,7 @@ const Produtos = lazy(() => import("./pages/Produtos"));
 const Entradas = lazy(() => import("./pages/Entradas"));
 const Recebimentos = lazy(() => import("./pages/Recebimentos"));
 const PagamentosConfig = lazy(() => import("./pages/Pagamentos"));
+const WhatsappAvisos = lazy(() => import("./pages/WhatsappAvisos"));
 const FornecedorRecebimento = lazy(() => import("./pages/FornecedorRecebimento"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const BuscaTransportadoras = lazy(() => import("./pages/comercial/BuscaTransportadoras").then((m) => ({ default: m.BuscaTransportadoras })));
@@ -96,6 +97,7 @@ export default function App() {
                   <Route path="/recebimentos" element={<Protegida permissoes={["RECEBIMENTOS"]}><Recebimentos /></Protegida>} />
                   <Route path="/fornecedor" element={<FornecedorRecebimento />} />
                   <Route path="/pagamentos" element={<Protegida permissoes={["SOMENTE_ADMIN"]}><PagamentosConfig /></Protegida>} />
+                  <Route path="/whatsapp-avisos" element={<Protegida permissoes={["SOMENTE_ADMIN"]}><WhatsappAvisos /></Protegida>} />
                   <Route path="/orcamentos" element={<Protegida permissoes={["ORCAMENTOS"]}><Checkout modo="orcamento" /></Protegida>} />
                   <Route path="/usuarios" element={<Protegida permissoes={["USUARIOS"]}><Usuarios /></Protegida>} />
                   <Route path="/comercial/transportadoras" element={<Protegida permissoes={["COMERCIAL"]}><BuscaTransportadoras /></Protegida>} />

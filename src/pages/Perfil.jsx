@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import api, { mensagemErro } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Button, Card, Field, Input, PageHeader, useToast } from "../components/ui";
+import { Button, Card, Field, Input, PageHeader, Switch, useToast } from "../components/ui";
 import EnderecoCampos from "../components/EnderecoCampos";
 
 export default function Perfil() {
@@ -26,6 +26,21 @@ export default function Perfil() {
       toast({ titulo: "Erro ao salvar", descricao: mensagemErro(error), tipo: "erro" });
     } finally {
       setSalvando(false);
+    }
+  };
+
+  // Avisos de pedido no WhatsApp: salva na hora.
+  const [salvandoAvisos, setSalvandoAvisos] = useState(false);
+  const alternarAvisos = async (ativo) => {
+    setSalvandoAvisos(true);
+    try {
+      const { data } = await api.put("/auth/perfil", { whatsappAvisos: ativo });
+      atualizarUsuario(data);
+      toast({ titulo: ativo ? "Avisos no WhatsApp ligados" : "Avisos no WhatsApp desligados" });
+    } catch (error) {
+      toast({ titulo: "Não foi possível alterar", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setSalvandoAvisos(false);
     }
   };
 
@@ -75,6 +90,22 @@ export default function Perfil() {
         <EnderecoCampos valor={dados || {}} onChange={setDados} desabilitado={!editando} obrigatorio={usuario?.role === "CLIENTE"} />
         <p className="mt-2 text-xs text-muted-foreground">Endereço: dados usados para entregas e pedidos.</p>
       </Card>
+      {usuario?.role === "CLIENTE" && (
+        <Card className="mb-6 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Avisos do pedido no WhatsApp</h2>
+              <p className="text-sm text-muted-foreground">Avisamos quando recebemos o seu pedido, quando ele fica pronto e quando sai para entrega.</p>
+            </div>
+            <Switch
+              checked={usuario.whatsappAvisos !== false}
+              disabled={salvandoAvisos}
+              onChange={alternarAvisos}
+              label={usuario.whatsappAvisos !== false ? "Ligados" : "Desligados"}
+            />
+          </div>
+        </Card>
+      )}
       <Card className="p-5">
         <h2 className="font-semibold">Segurança</h2>
         <p className="mb-4 text-sm text-muted-foreground">Atualize sua senha de acesso</p>
