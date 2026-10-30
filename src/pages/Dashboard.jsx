@@ -90,7 +90,7 @@ function Resumo({ periodo }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">Receita líquida desconta taxas, frete, custo dos itens e custos pós-venda; sem custo cadastrado, considera R$ 0,00.</p>
+        <p className="text-xs text-muted-foreground">Receita aqui = pedidos expedidos (liberados) no período, incluindo pedidos antigos expedidos nele; por isso difere do "Realizado" da Meta, que conta pedidos criados no período. Receita líquida desconta taxas, frete, custo dos itens e custos pós-venda; sem custo cadastrado, considera R$ 0,00.</p>
         <Segmented value={modo} onChange={setModo} opcoes={[{ value: "bruta", label: "Receita bruta" }, { value: "liquida", label: "Receita líquida" }]} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -231,9 +231,10 @@ function Meta({ periodo }) {
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <MetricCard titulo="Meta do período" valor={moeda(d.metaPeriodo)} />
-          <MetricCard titulo="Realizado no período" valor={moeda(d.realizado)} />
+          <MetricCard titulo="Realizado no período" valor={moeda(d.realizado)} detalhe="Pedidos criados no período, menos cancelados" />
           <MetricCard titulo="Média diária" valor={moeda(d.metaDiaria)} detalhe="Meta diária do mês" />
         </div>
+        {d.composicao && <ConciliacaoRealizado d={d} />}
       </Card>
 
       <Card className="p-5">
@@ -274,6 +275,47 @@ function Meta({ periodo }) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+const qtd = (n) => `${numero(n)} ${n === 1 ? "pedido" : "pedidos"}`;
+function LinhaConciliacao({ sinal, rotulo, parte, forte }) {
+  return (
+    <div className={cx("flex justify-between gap-3 py-1", forte && "border-t border-border pt-2 font-semibold")}>
+      <span>
+        {sinal && <span className="mr-1 inline-block w-3 text-muted-foreground">{sinal}</span>}
+        {rotulo}
+        {parte && <span className="ml-1 text-xs text-muted-foreground">({qtd(parte.pedidos)})</span>}
+      </span>
+      <span className="whitespace-nowrap">{moeda(parte ? parte.valor : forte)}</span>
+    </div>
+  );
+}
+
+// Explica por que o realizado da meta difere da receita do Resumo.
+function ConciliacaoRealizado({ d }) {
+  const c = d.composicao;
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-slate-50 p-4 text-sm">
+      <p className="font-semibold">Por que o realizado é diferente da receita do Resumo?</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Não é erro, são dois critérios. A <b>meta</b> conta a venda no dia em que o pedido foi <b>criado</b>, mesmo que ainda não tenha sido liberado pelo Time de Vendas. A <b>receita do Resumo</b> conta só pedidos <b>expedidos</b> (liberados), incluindo pedidos de antes do período que foram expedidos agora.
+      </p>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <div>
+          <p className="mb-1 text-xs font-semibold text-muted-foreground uppercase">Realizado da meta</p>
+          <LinhaConciliacao rotulo="Criados no período e já liberados" parte={c.liberados} />
+          <LinhaConciliacao sinal="+" rotulo="Criados no período aguardando liberação" parte={c.aguardando} />
+          <LinhaConciliacao rotulo="Realizado no período" forte={d.realizado} />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-semibold text-muted-foreground uppercase">Receita bruta do Resumo</p>
+          <LinhaConciliacao rotulo="Criados no período e já liberados" parte={c.liberados} />
+          <LinhaConciliacao sinal="+" rotulo="Criados antes do período, expedidos nele" parte={c.antigosExpedidos} />
+          <LinhaConciliacao rotulo="Receita bruta (expedidos)" forte={d.receitaResumo} />
+        </div>
+      </div>
     </div>
   );
 }
