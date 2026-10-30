@@ -30,6 +30,7 @@ import RankingProdutos from "../components/dashboard/RankingProdutos";
 import Analise from "../components/dashboard/Analise";
 import TabelaOrdenavel from "../components/dashboard/TabelaOrdenavel";
 import GraficoResumo from "../components/dashboard/GraficoResumo";
+import ProdutosAtivos from "../components/dashboard/ProdutosAtivos";
 import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaFinanceiro, CelulaMetodo, CelulaNumero, CelulaVendas } from "../components/pedido/StatusCelulas";
 import { dataHora, exportarCsv, hojeISO, inicioMesISO, lerNumero, moeda, numero, percentual } from "../utils/format";
 import { FINANCEIRO, FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
@@ -501,7 +502,7 @@ function TabelaEstoque({ titulo, descricao, linhas, vazio, extra }) {
 }
 
 function Estoque({ periodo }) {
-  const [sub, setSub] = useState("RESUMO");
+  const [sub, setSub] = useState("ATIVOS");
   const [resumo, setResumo] = useState(null);
   const [mov, setMov] = useState(null);
   const [fila, setFila] = useState(null);
@@ -548,7 +549,8 @@ function Estoque({ periodo }) {
 
   return (
     <div className="space-y-4">
-      <Tabs abas={[{ value: "RESUMO", label: "Resumo" }, { value: "MOVIMENTACOES", label: "Movimentações" }, { value: "FILA", label: "Fila sob demanda" }]} ativa={sub} onChange={setSub} />
+      <Tabs abas={[{ value: "ATIVOS", label: "Produtos ativos e estoque" }, { value: "RESUMO", label: "Resumo" }, { value: "MOVIMENTACOES", label: "Movimentações" }, { value: "FILA", label: "Fila sob demanda" }]} ativa={sub} onChange={setSub} />
+      {sub === "ATIVOS" && <ProdutosAtivos />}
       {sub === "RESUMO" &&
         (!resumo ? (
           <Skeleton className="h-64" />
