@@ -236,10 +236,10 @@ export default function Analise({ periodo }) {
   const totalVermelho = vermelho.vendidosComPrejuizo.length + vermelho.precoAbaixoDoCusto.length;
 
   const CONFIG_RANKING = {
-    pacotes: { titulo: "Mais vendidos", cor: AZUL, colunas: [["Qtd.", (v) => `${numero(v.pacotes)} emb.`], ["Unidades", (v) => numero(v.unidades)], ["Receita", (v) => moeda(v.receita)]] },
-    receita: { titulo: "Maior receita", cor: ROXO, colunas: [["Receita", (v) => moeda(v.receita)], ["Qtd.", (v) => `${numero(v.pacotes)} emb.`]], formato: moeda },
-    margemPercentual: { titulo: "Maior margem", cor: VERDE, colunas: [["Margem", (v) => percentual(v.margemPercentual)], ["Receita", (v) => moeda(v.receita)], ["Lucro", (v) => moeda(v.lucro)]] },
-    lucro: { titulo: "Maior lucro", cor: VERDE, colunas: [["Lucro", (v) => moeda(v.lucro)], ["Margem", (v) => percentual(v.margemPercentual)], ["Receita", (v) => moeda(v.receita)]], formato: moeda },
+    pacotes: { titulo: "Mais vendidos", cor: AZUL, colunas: [["Qtd.", (v) => `${numero(v.pacotes)} emb.`, "pacotes"], ["Unidades", (v) => numero(v.unidades), "unidades"], ["Receita", (v) => moeda(v.receita), "receita"]] },
+    receita: { titulo: "Maior receita", cor: ROXO, colunas: [["Receita", (v) => moeda(v.receita), "receita"], ["Qtd.", (v) => `${numero(v.pacotes)} emb.`, "pacotes"]], formato: moeda },
+    margemPercentual: { titulo: "Maior margem", cor: VERDE, colunas: [["Margem", (v) => percentual(v.margemPercentual), "margemPercentual"], ["Receita", (v) => moeda(v.receita), "receita"], ["Lucro", (v) => moeda(v.lucro), "lucro"]] },
+    lucro: { titulo: "Maior lucro", cor: VERDE, colunas: [["Lucro", (v) => moeda(v.lucro), "lucro"], ["Margem", (v) => percentual(v.margemPercentual), "margemPercentual"], ["Receita", (v) => moeda(v.receita), "receita"]], formato: moeda },
   };
   const cfg = CONFIG_RANKING[ranking];
 

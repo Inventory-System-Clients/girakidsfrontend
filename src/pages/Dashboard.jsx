@@ -155,8 +155,8 @@ function Resumo({ periodo }) {
         <h2 className="text-lg font-semibold">Produtos em destaque</h2>
         <p className="mb-3 text-sm text-muted-foreground">Todos os produtos do período por quantidade vendida e por margem de lucro — filtre Top 10, Top 3 ou o mais.</p>
         <div className="grid gap-4 lg:grid-cols-2">
-          <RankingProdutos titulo="Por quantidade vendida" descricao="Itens com maior volume vendido em pedidos expedidos." dados={d.topQuantidade} chave="pacotes" cor={AZUL} colunas={[["Qtd.", (x) => `${numero(x.pacotes)} un.`], ["Receita", (x) => moeda(x.receita)]]} />
-          <RankingProdutos titulo="Por margem de lucro" descricao="Itens expedidos com custo totalmente coberto, ordenados pela margem percentual." dados={d.topMargem} chave="margemPercentual" cor={VERDE} colunas={[["Margem", (x) => percentual(x.margemPercentual)], ["Receita", (x) => moeda(x.receita)], ["Lucro", (x) => moeda(x.lucro)]]} />
+          <RankingProdutos titulo="Por quantidade vendida" descricao="Itens com maior volume vendido em pedidos expedidos." dados={d.topQuantidade} chave="pacotes" cor={AZUL} colunas={[["Qtd.", (x) => `${numero(x.pacotes)} un.`, "pacotes"], ["Receita", (x) => moeda(x.receita), "receita"]]} />
+          <RankingProdutos titulo="Por margem de lucro" descricao="Itens expedidos com custo totalmente coberto, ordenados pela margem percentual." dados={d.topMargem} chave="margemPercentual" cor={VERDE} colunas={[["Margem", (x) => percentual(x.margemPercentual), "margemPercentual"], ["Receita", (x) => moeda(x.receita), "receita"], ["Lucro", (x) => moeda(x.lucro), "lucro"]]} />
         </div>
       </section>
     </div>
