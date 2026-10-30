@@ -246,7 +246,7 @@ export default function Analise({ periodo }) {
   return (
     <div className="space-y-6">
       <p className="text-xs text-muted-foreground">
-        Considera os {d.pedidos} pedidos expedidos do período selecionado. Receita {moeda(totais.receita)} · lucro dos itens {moeda(totais.lucro)} · {totais.produtosVendidos} produtos vendidos
+        Considera os {d.pedidos} pedidos criados no período selecionado (menos cancelados). Receita {moeda(totais.receita)} · lucro dos itens {moeda(totais.lucro)} · {totais.produtosVendidos} produtos vendidos
         {totais.semCusto > 0 && ` · ${totais.semCusto} sem custo cadastrado (contam custo R$ 0,00)`}.
       </p>
 
@@ -314,7 +314,7 @@ export default function Analise({ periodo }) {
         <RankingProdutos
           key={ranking}
           titulo={cfg.titulo}
-          descricao="Todos os produtos vendidos em pedidos expedidos no período."
+          descricao="Todos os produtos vendidos nos pedidos do período."
           dados={ordenados}
           chave={ranking}
           cor={cfg.cor}

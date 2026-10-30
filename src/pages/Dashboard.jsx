@@ -43,14 +43,14 @@ const ORDEM_DIA = (l) => ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sá
 // Colunas das tabelas por dia da semana (clicar no título ordena).
 const COLUNAS_VENDAS = [
   { titulo: "Dia", alinhar: "text-left", valor: ORDEM_DIA, render: (l) => <span className="font-medium">{l.dia}</span>, total: () => "Total" },
-  { titulo: "Pedidos", valor: (l) => l.vendasPedidos, render: (l) => numero(l.vendasPedidos), total: (ls) => numero(somar(ls, "vendasPedidos")) },
+  { titulo: "Pedidos", valor: (l) => l.pedidos, render: (l) => numero(l.pedidos), total: (ls) => numero(somar(ls, "pedidos")) },
   {
     titulo: "Ticket médio",
-    valor: (l) => (l.vendasPedidos ? l.vendas / l.vendasPedidos : null),
-    render: (l) => (l.vendasPedidos ? moeda(l.vendas / l.vendasPedidos) : "--"),
-    total: (ls) => (somar(ls, "vendasPedidos") ? moeda(somar(ls, "vendas") / somar(ls, "vendasPedidos")) : "--"),
+    valor: (l) => (l.pedidos ? l.bruta / l.pedidos : null),
+    render: (l) => (l.pedidos ? moeda(l.bruta / l.pedidos) : "--"),
+    total: (ls) => (somar(ls, "pedidos") ? moeda(somar(ls, "bruta") / somar(ls, "pedidos")) : "--"),
   },
-  { titulo: "Vendas", valor: (l) => l.vendas, render: (l) => moeda(l.vendas), total: (ls) => moeda(somar(ls, "vendas")) },
+  { titulo: "Vendas", valor: (l) => l.bruta, render: (l) => moeda(l.bruta), total: (ls) => moeda(somar(ls, "bruta")) },
 ];
 
 const COLUNAS_LUCRO = [
@@ -90,14 +90,14 @@ function Resumo({ periodo }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">Receita aqui = pedidos expedidos (liberados) no período, incluindo pedidos antigos expedidos nele; por isso difere do "Realizado" da Meta, que conta pedidos criados no período. Receita líquida desconta taxas, frete, custo dos itens e custos pós-venda; sem custo cadastrado, considera R$ 0,00.</p>
+        <p className="text-xs text-muted-foreground">Receita = pedidos criados no período, menos cancelados (mesmo valor do "Realizado" da Meta). Pedido tirado em outro período conta lá, mesmo que seja expedido agora. Receita líquida desconta taxas, frete, custo dos itens e custos pós-venda; sem custo cadastrado, considera R$ 0,00.</p>
         <Segmented value={modo} onChange={setModo} opcoes={[{ value: "bruta", label: "Receita bruta" }, { value: "liquida", label: "Receita líquida" }]} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard titulo={nome} valor={moeda(d.cards.total[r])} detalhe={`${d.cards.total.pedidos} pedidos expedidos no período`} />
-        <MetricCard titulo={`${nome} recebida`} valor={moeda(d.cards.recebida[r])} detalhe={`${d.cards.recebida.pedidos} pedidos expedidos recebidos no período`} />
-        <MetricCard titulo={`${nome} em aberto`} valor={moeda(d.cards.aberto[r])} detalhe={`${d.cards.aberto.pedidos} pedidos expedidos em aberto no período`} />
-        <MetricCard titulo={`${nome} de pedidos antigos`} valor={moeda(d.cards.antigos[r])} detalhe={`${d.cards.antigos.pedidos} pedidos expedidos criados antes do período`} />
+        <MetricCard titulo={nome} valor={moeda(d.cards.total[r])} detalhe={`${d.cards.total.pedidos} pedidos criados no período`} />
+        <MetricCard titulo={`${nome} recebida`} valor={moeda(d.cards.recebida[r])} detalhe={`${d.cards.recebida.pedidos} pedidos do período já pagos`} />
+        <MetricCard titulo={`${nome} em aberto`} valor={moeda(d.cards.aberto[r])} detalhe={`${d.cards.aberto.pedidos} pedidos do período com pagamento em aberto`} />
+        <MetricCard titulo={`${nome} aguardando liberação`} valor={moeda(d.cards.aguardando[r])} detalhe={`${d.cards.aguardando.pedidos} pedidos do período ainda não liberados pelo Time de Vendas`} />
       </div>
       <div className="flex justify-center">
         <button onClick={() => setExpandido(!expandido)} className="rounded-full border border-border bg-white p-1.5 shadow-sm" aria-label="Mais indicadores">
@@ -116,8 +116,8 @@ function Resumo({ periodo }) {
       )}
 
       <section>
-        <h2 className="text-lg font-semibold">Pedidos expedidos por dia da semana</h2>
-        <p className="mb-3 text-sm text-muted-foreground">Quantidade, receita bruta e receita líquida dos pedidos expedidos no período selecionado.</p>
+        <h2 className="text-lg font-semibold">Pedidos por dia da semana</h2>
+        <p className="mb-3 text-sm text-muted-foreground">Quantidade, receita bruta e receita líquida dos pedidos criados no período selecionado (menos cancelados), pelo dia em que foram tirados.</p>
         <Card className="h-80 p-4">
           <ResponsiveContainer>
             <ComposedChart data={d.semana}>
@@ -144,7 +144,7 @@ function Resumo({ periodo }) {
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Total</p>
-              <p className="font-bold">{moeda(somar(d.semana, "vendas"))}</p>
+              <p className="font-bold">{moeda(somar(d.semana, "bruta"))}</p>
             </div>
           </div>
           <TabelaOrdenavel linhas={d.semana} colunas={COLUNAS_VENDAS} chave="dia" />
@@ -153,7 +153,7 @@ function Resumo({ periodo }) {
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <p className="font-semibold">Lucro líquido por dia da semana</p>
-              <p className="text-xs text-muted-foreground">Pedidos expedidos: receita menos taxas, frete, custo dos itens e custos pós-venda (sem custo cadastrado vale R$ 0,00).</p>
+              <p className="text-xs text-muted-foreground">Pedidos do período: receita menos taxas, frete, custo dos itens e custos pós-venda (sem custo cadastrado vale R$ 0,00).</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Total</p>
@@ -168,8 +168,8 @@ function Resumo({ periodo }) {
         <h2 className="text-lg font-semibold">Produtos em destaque</h2>
         <p className="mb-3 text-sm text-muted-foreground">Todos os produtos do período por quantidade vendida e por margem de lucro — filtre Top 10, Top 3 ou o mais.</p>
         <div className="grid gap-4 lg:grid-cols-2">
-          <RankingProdutos titulo="Por quantidade vendida" descricao="Itens com maior volume vendido em pedidos expedidos." dados={d.topQuantidade} chave="pacotes" cor={AZUL} colunas={[["Qtd.", (x) => `${numero(x.pacotes)} un.`, "pacotes"], ["Receita", (x) => moeda(x.receita), "receita"]]} />
-          <RankingProdutos titulo="Por margem de lucro" descricao="Itens expedidos com custo totalmente coberto, ordenados pela margem percentual." dados={d.topMargem} chave="margemPercentual" cor={VERDE} colunas={[["Margem", (x) => percentual(x.margemPercentual), "margemPercentual"], ["Receita", (x) => moeda(x.receita), "receita"], ["Lucro", (x) => moeda(x.lucro), "lucro"]]} />
+          <RankingProdutos titulo="Por quantidade vendida" descricao="Itens com maior volume vendido nos pedidos do período." dados={d.topQuantidade} chave="pacotes" cor={AZUL} colunas={[["Qtd.", (x) => `${numero(x.pacotes)} un.`, "pacotes"], ["Receita", (x) => moeda(x.receita), "receita"]]} />
+          <RankingProdutos titulo="Por margem de lucro" descricao="Itens vendidos no período com custo totalmente cadastrado, ordenados pela margem percentual." dados={d.topMargem} chave="margemPercentual" cor={VERDE} colunas={[["Margem", (x) => percentual(x.margemPercentual), "margemPercentual"], ["Receita", (x) => moeda(x.receita), "receita"], ["Lucro", (x) => moeda(x.lucro), "lucro"]]} />
         </div>
       </section>
     </div>
@@ -234,7 +234,7 @@ function Meta({ periodo }) {
           <MetricCard titulo="Realizado no período" valor={moeda(d.realizado)} detalhe="Pedidos criados no período, menos cancelados" />
           <MetricCard titulo="Média diária" valor={moeda(d.metaDiaria)} detalhe="Meta diária do mês" />
         </div>
-        {d.composicao && <ConciliacaoRealizado d={d} />}
+        <p className="mt-3 text-xs text-muted-foreground">O realizado é o mesmo valor da receita bruta do Resumo e das demais abas do Financeiro.</p>
       </Card>
 
       <Card className="p-5">
@@ -275,47 +275,6 @@ function Meta({ periodo }) {
           }}
         />
       )}
-    </div>
-  );
-}
-
-const qtd = (n) => `${numero(n)} ${n === 1 ? "pedido" : "pedidos"}`;
-function LinhaConciliacao({ sinal, rotulo, parte, forte }) {
-  return (
-    <div className={cx("flex justify-between gap-3 py-1", forte && "border-t border-border pt-2 font-semibold")}>
-      <span>
-        {sinal && <span className="mr-1 inline-block w-3 text-muted-foreground">{sinal}</span>}
-        {rotulo}
-        {parte && <span className="ml-1 text-xs text-muted-foreground">({qtd(parte.pedidos)})</span>}
-      </span>
-      <span className="whitespace-nowrap">{moeda(parte ? parte.valor : forte)}</span>
-    </div>
-  );
-}
-
-// Explica por que o realizado da meta difere da receita do Resumo.
-function ConciliacaoRealizado({ d }) {
-  const c = d.composicao;
-  return (
-    <div className="mt-4 rounded-lg border border-border bg-slate-50 p-4 text-sm">
-      <p className="font-semibold">Por que o realizado é diferente da receita do Resumo?</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Não é erro, são dois critérios. A <b>meta</b> conta a venda no dia em que o pedido foi <b>criado</b>, mesmo que ainda não tenha sido liberado pelo Time de Vendas. A <b>receita do Resumo</b> conta só pedidos <b>expedidos</b> (liberados), incluindo pedidos de antes do período que foram expedidos agora.
-      </p>
-      <div className="mt-3 grid gap-4 md:grid-cols-2">
-        <div>
-          <p className="mb-1 text-xs font-semibold text-muted-foreground uppercase">Realizado da meta</p>
-          <LinhaConciliacao rotulo="Criados no período e já liberados" parte={c.liberados} />
-          <LinhaConciliacao sinal="+" rotulo="Criados no período aguardando liberação" parte={c.aguardando} />
-          <LinhaConciliacao rotulo="Realizado no período" forte={d.realizado} />
-        </div>
-        <div>
-          <p className="mb-1 text-xs font-semibold text-muted-foreground uppercase">Receita bruta do Resumo</p>
-          <LinhaConciliacao rotulo="Criados no período e já liberados" parte={c.liberados} />
-          <LinhaConciliacao sinal="+" rotulo="Criados antes do período, expedidos nele" parte={c.antigosExpedidos} />
-          <LinhaConciliacao rotulo="Receita bruta (expedidos)" forte={d.receitaResumo} />
-        </div>
-      </div>
     </div>
   );
 }
