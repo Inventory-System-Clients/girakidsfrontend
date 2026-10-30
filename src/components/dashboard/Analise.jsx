@@ -3,6 +3,7 @@ import { AlertTriangle, Boxes, Crown, Package, Percent, Search, TrendingDown, Tr
 import api from "../../services/api";
 import { Badge, Card, Segmented, Skeleton, cx } from "../ui";
 import RankingProdutos from "./RankingProdutos";
+import TendenciasEstoque from "./TendenciasEstoque";
 import { contemTexto, moeda, moedaUnitaria, numero, percentual } from "../../utils/format";
 
 const AZUL = "#2563eb";
@@ -322,6 +323,8 @@ export default function Analise({ periodo }) {
           formatoGrafico={cfg.formato}
         />
       </section>
+
+      <TendenciasEstoque />
 
       <ProdutosAtivos />
     </div>
