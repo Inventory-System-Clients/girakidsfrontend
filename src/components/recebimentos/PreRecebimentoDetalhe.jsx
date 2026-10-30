@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Ban, CheckCircle2, Link2, Pencil, RefreshCw, Undo2 } from "lucide-react";
+import { AlertTriangle, Ban, CheckCircle2, Link2, Pencil, RefreshCw, Trash2, Undo2 } from "lucide-react";
 import api, { mensagemErro } from "../../services/api";
 import { Button, Checkbox, Dialog, Field, Input, Select, Skeleton, Textarea, cx, useConfirm, useToast } from "../ui";
 import { data, dataHora, hojeISO, lerNumero, moeda } from "../../utils/format";
-import { LinkFornecedor, Miniatura, SOLUCOES, StatusPre, TipoItem, atualizarAlertasRecebimentos, un } from "./comum";
+import { LinkFornecedor, Miniatura, SOLUCOES, StatusPre, TipoItem, atualizarAlertasRecebimentos, excluirPreRecebimento, un } from "./comum";
 
 const ABERTOS = ["AGUARDANDO_FORNECEDOR", "FORNECEDOR_RESPONDEU"];
 
@@ -110,6 +110,13 @@ export default function PreRecebimentoDetalhe({ id, linkInicial, fornecedores, o
     await acao(() => api.post(`/recebimentos/${pre.id}/estornar`, { motivo }), () => ({ titulo: "Recebimento estornado" }));
   };
 
+  const excluir = async () => {
+    if (await excluirPreRecebimento(pre, { confirmar, toast })) {
+      onAlterado?.();
+      onFechar();
+    }
+  };
+
   const novoLink = async () => {
     const ok = await confirmar({ titulo: "Gerar novo link?", mensagem: "O link atual para de funcionar. Use se ele foi enviado para a pessoa errada.", confirmar: "Gerar novo link" });
     if (ok) await acao(() => api.post(`/recebimentos/${pre.id}/link`), () => ({ titulo: "Novo link gerado" }));
@@ -153,6 +160,11 @@ export default function PreRecebimentoDetalhe({ id, linkInicial, fornecedores, o
             {["RECEBIDO", "RECEBIDO_PARCIAL"].includes(pre.status) && (
               <Button variant="danger-outline" onClick={estornar} disabled={enviando}>
                 <Undo2 className="h-4 w-4" /> Estornar
+              </Button>
+            )}
+            {!conferindo && (
+              <Button variant="danger-outline" onClick={excluir} disabled={enviando} title="Apaga de vez; se já foi recebido, tira do estoque antes">
+                <Trash2 className="h-4 w-4" /> Excluir
               </Button>
             )}
             {!aberto && <Button variant="outline" onClick={onFechar}>Fechar</Button>}

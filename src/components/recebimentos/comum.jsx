@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useEffect, useRef, useState } from "react";
 import { Copy, Package, Search } from "lucide-react";
-import api from "../../services/api";
+import api, { mensagemErro } from "../../services/api";
 import { BotaoWhatsapp } from "../Whatsapp";
 import { Button, cx, useToast } from "../ui";
 import { numero } from "../../utils/format";
@@ -186,3 +186,27 @@ export function useAlertasRecebimentos(habilitado) {
   }, [habilitado]);
   return habilitado ? alertas : null;
 }
+
+// Exclui o pré-recebimento de vez, depois de confirmar. Recebido: a entrada no
+// estoque é desfeita antes. Devolve true se excluiu.
+export const excluirPreRecebimento = async (pre, { confirmar, toast }) => {
+  const recebido = ["RECEBIDO", "RECEBIDO_PARCIAL"].includes(pre.status);
+  const ok = await confirmar({
+    titulo: `Excluir ${pre.direto ? "recebimento" : "pré-recebimento"} nº ${pre.numero} definitivamente?`,
+    mensagem: recebido
+      ? "Ele some da lista e não dá para desfazer. Como já foi recebido, as quantidades que entraram saem do estoque antes de excluir."
+      : "Ele some da lista e não dá para desfazer. O link do fornecedor para de funcionar.",
+    perigo: true,
+    confirmar: "Excluir definitivamente",
+  });
+  if (!ok) return false;
+  try {
+    const { data: d } = await api.delete(`/recebimentos/${pre.id}`);
+    toast({ titulo: `Nº ${d.numero} excluído`, descricao: d.estornado ? "As quantidades recebidas saíram do estoque." : undefined });
+    atualizarAlertasRecebimentos();
+    return true;
+  } catch (error) {
+    toast({ titulo: "Não foi possível excluir", descricao: mensagemErro(error), tipo: "erro" });
+    return false;
+  }
+};

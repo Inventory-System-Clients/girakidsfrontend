@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, BellRing, ClipboardList, Clock, PackageCheck, PackagePlus, Search, ShoppingCart, Truck } from "lucide-react";
+import { AlertTriangle, BellRing, ClipboardList, Clock, PackageCheck, PackagePlus, Search, ShoppingCart, Trash2, Truck } from "lucide-react";
 import api from "../services/api";
-import { Button, Card, EmptyState, PageHeader, Segmented, Skeleton, Table, Tabs, Td, Th, cx } from "../components/ui";
+import { Button, Card, EmptyState, PageHeader, Segmented, Skeleton, Table, Tabs, Td, Th, cx, useConfirm, useToast } from "../components/ui";
 import { data, dataHora } from "../utils/format";
-import { Miniatura, SALDOS, StatusPre, TipoItem, atualizarAlertasRecebimentos, un, useAlertasRecebimentos } from "../components/recebimentos/comum";
+import { Miniatura, SALDOS, StatusPre, TipoItem, atualizarAlertasRecebimentos, excluirPreRecebimento, un, useAlertasRecebimentos } from "../components/recebimentos/comum";
 import PreRecebimentoForm from "../components/recebimentos/PreRecebimentoForm";
 import PreRecebimentoDetalhe from "../components/recebimentos/PreRecebimentoDetalhe";
 import Fornecedores from "../components/recebimentos/Fornecedores";
@@ -70,14 +70,14 @@ function FaixaAlertas({ alertas, onAbrir, onAba }) {
   );
 }
 
-function ListaRecebimentos({ lista, onAbrir }) {
+function ListaRecebimentos({ lista, onAbrir, onExcluir }) {
   if (!lista) return <Skeleton className="h-64" />;
   if (!lista.length) return <EmptyState icon={PackageCheck} titulo="Nada por aqui" descricao="Crie um pré-recebimento quando fizer uma compra, ou lance direto o que chegou." />;
   return (
     <Table>
       <thead>
         <tr>
-          {["Nº", "Fornecedor", "Itens", "Pedido", "Fornecedor confirmou", "Recebido", "Previsão", "Status"].map((c) => (
+          {["Nº", "Fornecedor", "Itens", "Pedido", "Fornecedor confirmou", "Recebido", "Previsão", "Status", ...(onExcluir ? [""] : [])].map((c) => (
             <Th key={c}>{c}</Th>
           ))}
         </tr>
@@ -115,6 +115,21 @@ function ListaRecebimentos({ lista, onAbrir }) {
               <StatusPre status={p.status} />
               {p.divergenciaStatus === "ABERTA" && <span className="mt-1 block text-[11px] font-bold text-red-600">falta em aberto</span>}
             </Td>
+            {onExcluir && (
+              <Td>
+                <button
+                  type="button"
+                  title="Excluir definitivamente"
+                  className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExcluir(p);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </Td>
+            )}
           </tr>
         ))}
       </tbody>
@@ -193,6 +208,8 @@ export default function Recebimentos() {
   const [aberto, setAberto] = useState(null);
   const alertas = useAlertasRecebimentos(true);
   const navigate = useNavigate();
+  const confirmar = useConfirm();
+  const toast = useToast();
 
   const carregarLista = useCallback(() => {
     api.get("/recebimentos", { params: { ...FILTROS[filtro].params, busca: busca || undefined } }).then(({ data: d }) => setLista(d));
@@ -283,7 +300,7 @@ export default function Recebimentos() {
               <input className="input h-9 pl-9" placeholder="Nº, fornecedor ou produto..." value={busca} onChange={(e) => setBusca(e.target.value)} />
             </div>
           </div>
-          <ListaRecebimentos lista={lista} onAbrir={(id) => setAberto({ id })} />
+          <ListaRecebimentos lista={lista} onAbrir={(id) => setAberto({ id })} onExcluir={filtro === "todos" ? async (p) => (await excluirPreRecebimento(p, { confirmar, toast })) && alterado() : undefined} />
         </>
       )}
       {aba === "montagem" && (painel ? <AbaMontagem painel={painel} onPainel={setPainel} /> : <Skeleton className="h-64" />)}
