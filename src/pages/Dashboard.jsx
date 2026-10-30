@@ -152,9 +152,9 @@ function Resumo({ periodo }) {
         </div>
       )}
 
-      <Recebimentos pagos={d.pagos} />
-
       <GraficoResumo d={d} />
+
+      <Recebimentos pagos={d.pagos} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-4">
