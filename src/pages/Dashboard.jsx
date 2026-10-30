@@ -368,6 +368,7 @@ function PedidosExpedidos({ periodo }) {
   }, [periodo, busca, formas, financeiro]);
   if (!d) return <Skeleton className="h-96" />;
   const pct = (a, b) => (b ? `(${Math.round((a / b) * 100)}%)` : "");
+  const filtrando = Boolean(busca.trim() || formas.length || financeiro.length);
 
   return (
     <div className="space-y-4">
@@ -379,16 +380,19 @@ function PedidosExpedidos({ periodo }) {
           <MetricCard titulo='Qtd. de pedidos "Aguardando pagamento"' valor={d.totalPeriodo.aguardandoPagamento} />
         </div>
         <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm font-semibold">Resultado filtrado</p>
+          <p className="text-sm font-semibold">{filtrando ? "Resultado filtrado" : "Por forma de pagamento"}</p>
           <button className="text-xs text-primary" onClick={() => setMostrarFormas(!mostrarFormas)}>
-            {mostrarFormas ? "Ocultar" : "Exibir"} resultado filtrado por forma de pagamento
+            {mostrarFormas ? "Ocultar" : "Exibir"} resultado por forma de pagamento
           </button>
         </div>
-        <div className="mt-2 grid gap-3 sm:grid-cols-3">
-          <MetricCard titulo="Valor dos pedidos expedidos" valor={moeda(d.filtrado.valor)} detalhe={pct(d.filtrado.valor, d.totalPeriodo.valor)} />
-          <MetricCard titulo="Qtd. de pedidos expedidos" valor={d.filtrado.quantidade} detalhe={pct(d.filtrado.quantidade, d.totalPeriodo.quantidade)} />
-          <MetricCard titulo='Qtd. de pedidos "Aguardando pagamento"' valor={d.filtrado.aguardandoPagamento} detalhe={pct(d.filtrado.aguardandoPagamento, d.totalPeriodo.aguardandoPagamento)} />
-        </div>
+        {/* Sem busca/filtro o resultado seria igual ao total: só aparece filtrando. */}
+        {filtrando && (
+          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+            <MetricCard titulo="Valor dos pedidos expedidos" valor={moeda(d.filtrado.valor)} detalhe={pct(d.filtrado.valor, d.totalPeriodo.valor)} />
+            <MetricCard titulo="Qtd. de pedidos expedidos" valor={d.filtrado.quantidade} detalhe={pct(d.filtrado.quantidade, d.totalPeriodo.quantidade)} />
+            <MetricCard titulo='Qtd. de pedidos "Aguardando pagamento"' valor={d.filtrado.aguardandoPagamento} detalhe={pct(d.filtrado.aguardandoPagamento, d.totalPeriodo.aguardandoPagamento)} />
+          </div>
+        )}
         {mostrarFormas && (
           <div className="mt-3 flex flex-wrap gap-2">
             {d.porForma.map((f) => (
