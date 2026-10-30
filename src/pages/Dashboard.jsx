@@ -28,6 +28,7 @@ import {
 import AcoesPedido from "../components/pedido/AcoesPedido";
 import RankingProdutos from "../components/dashboard/RankingProdutos";
 import Analise from "../components/dashboard/Analise";
+import TabelaOrdenavel from "../components/dashboard/TabelaOrdenavel";
 import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaFinanceiro, CelulaMetodo, CelulaNumero, CelulaVendas } from "../components/pedido/StatusCelulas";
 import { dataHora, exportarCsv, hojeISO, inicioMesISO, lerNumero, moeda, numero, percentual } from "../utils/format";
 import { FINANCEIRO, FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
@@ -35,6 +36,41 @@ import { FINANCEIRO, FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
 const ROSA = "#f43f5e";
 const AZUL = "#2563eb";
 const VERDE = "#0f766e";
+const somar = (linhas, campo) => linhas.reduce((t, l) => t + (Number(l[campo]) || 0), 0);
+const margemLiquida = (liquida, bruta) => (bruta > 0 ? (liquida / bruta) * 100 : null);
+const ORDEM_DIA = (l) => ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"].indexOf(l.dia);
+
+// Colunas das tabelas por dia da semana (clicar no título ordena).
+const COLUNAS_VENDAS = [
+  { titulo: "Dia", alinhar: "text-left", valor: ORDEM_DIA, render: (l) => <span className="font-medium">{l.dia}</span>, total: () => "Total" },
+  { titulo: "Pedidos", valor: (l) => l.vendasPedidos, render: (l) => numero(l.vendasPedidos), total: (ls) => numero(somar(ls, "vendasPedidos")) },
+  {
+    titulo: "Ticket médio",
+    valor: (l) => (l.vendasPedidos ? l.vendas / l.vendasPedidos : null),
+    render: (l) => (l.vendasPedidos ? moeda(l.vendas / l.vendasPedidos) : "--"),
+    total: (ls) => (somar(ls, "vendasPedidos") ? moeda(somar(ls, "vendas") / somar(ls, "vendasPedidos")) : "--"),
+  },
+  { titulo: "Vendas", valor: (l) => l.vendas, render: (l) => moeda(l.vendas), total: (ls) => moeda(somar(ls, "vendas")) },
+];
+
+const COLUNAS_LUCRO = [
+  { titulo: "Dia", alinhar: "text-left", valor: ORDEM_DIA, render: (l) => <span className="font-medium">{l.dia}</span>, total: () => "Total" },
+  { titulo: "Pedidos", valor: (l) => l.pedidos, render: (l) => numero(l.pedidos), total: (ls) => numero(somar(ls, "pedidos")) },
+  { titulo: "Receita", valor: (l) => l.bruta, render: (l) => moeda(l.bruta), total: (ls) => moeda(somar(ls, "bruta")) },
+  {
+    titulo: "Margem",
+    valor: (l) => margemLiquida(l.liquida, l.bruta),
+    render: (l) => (l.bruta > 0 ? percentual(margemLiquida(l.liquida, l.bruta)) : "--"),
+    total: (ls) => (somar(ls, "bruta") > 0 ? percentual(margemLiquida(somar(ls, "liquida"), somar(ls, "bruta"))) : "--"),
+  },
+  {
+    titulo: "Lucro líquido",
+    valor: (l) => l.liquida,
+    render: (l) => <span className={l.liquida < 0 ? "text-red-700" : ""}>{moeda(l.liquida)}</span>,
+    total: (ls) => moeda(somar(ls, "liquida")),
+  },
+];
+
 const moedaCurta = (v) => (Math.abs(v) >= 1000 ? `R$ ${numero(v / 1000, 1)} mil` : moeda(v));
 
 // ---------------------------------------------------------------------------
@@ -50,8 +86,6 @@ function Resumo({ periodo }) {
   if (!d) return <Skeleton className="h-96" />;
   const r = modo === "bruta" ? "bruta" : "liquida";
   const nome = modo === "bruta" ? "Receita bruta" : "Receita líquida";
-  const totalMargem = d.semana.reduce((s, x) => s + x.margem, 0);
-  const totalVenda = d.semana.reduce((s, x) => s + (x.margemPercentual ? (x.margem / x.margemPercentual) * 100 : 0), 0);
 
   return (
     <div className="space-y-6">
@@ -103,51 +137,30 @@ function Resumo({ periodo }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-4">
-          <div className="mb-3 flex items-start justify-between">
+          <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold">{nome} por dia da semana</p>
-              <p className="text-xs text-muted-foreground">Somente pedidos expedidos no período.</p>
+              <p className="font-semibold">Vendas por dia da semana</p>
+              <p className="text-xs text-muted-foreground">Mesmo valor do "Realizado" da Meta: pedidos criados no período, menos cancelados.</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Total</p>
-              <p className="font-bold">{moeda(d.cards.total[r])}</p>
+              <p className="font-bold">{moeda(somar(d.semana, "vendas"))}</p>
             </div>
           </div>
-          {d.semana.map((s, i) => (
-            <div key={s.dia} className={cx("flex justify-between rounded px-3 py-2", i % 2 === 0 && "bg-slate-50")}>
-              <span>
-                <span className="block text-sm font-medium">{s.dia}</span>
-                <span className="text-xs text-muted-foreground">{s.pedidos} {s.pedidos === 1 ? "pedido" : "pedidos"}</span>
-              </span>
-              <span className="self-center text-sm font-semibold">{moeda(s[r])}</span>
-            </div>
-          ))}
+          <TabelaOrdenavel linhas={d.semana} colunas={COLUNAS_VENDAS} chave="dia" />
         </Card>
         <Card className="p-4">
-          <div className="mb-3 flex items-start justify-between">
+          <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold">Margem bruta por dia da semana</p>
-              <p className="text-xs text-muted-foreground">Venda dos itens menos custo; custo não cadastrado vale R$ 0,00.</p>
+              <p className="font-semibold">Lucro líquido por dia da semana</p>
+              <p className="text-xs text-muted-foreground">Pedidos expedidos: receita menos taxas, frete, custo dos itens e custos pós-venda (sem custo cadastrado vale R$ 0,00).</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Total</p>
-              <p className="font-bold">
-                {moeda(totalMargem)} com {totalVenda ? percentual((totalMargem / totalVenda) * 100) : "--"}
-              </p>
+              <p className="font-bold">{moeda(somar(d.semana, "liquida"))}</p>
             </div>
           </div>
-          {d.semana.map((s, i) => (
-            <div key={s.dia} className={cx("flex justify-between rounded px-3 py-2", i % 2 === 0 && "bg-slate-50")}>
-              <span>
-                <span className="block text-sm font-medium">{s.dia}</span>
-                <span className="text-xs text-muted-foreground">{s.pedidos} {s.pedidos === 1 ? "pedido" : "pedidos"}</span>
-              </span>
-              <span className="text-right">
-                <span className="block text-sm font-semibold">{moeda(s.margem)}</span>
-                <span className="text-xs text-muted-foreground">{s.margemPercentual != null ? `com ${percentual(s.margemPercentual)} de margem` : "--"}</span>
-              </span>
-            </div>
-          ))}
+          <TabelaOrdenavel linhas={d.semana} colunas={COLUNAS_LUCRO} chave="dia" />
         </Card>
       </div>
 
