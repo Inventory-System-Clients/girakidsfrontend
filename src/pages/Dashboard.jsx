@@ -29,6 +29,7 @@ import AcoesPedido from "../components/pedido/AcoesPedido";
 import RankingProdutos from "../components/dashboard/RankingProdutos";
 import Analise from "../components/dashboard/Analise";
 import TabelaOrdenavel from "../components/dashboard/TabelaOrdenavel";
+import GraficoResumo from "../components/dashboard/GraficoResumo";
 import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaFinanceiro, CelulaMetodo, CelulaNumero, CelulaVendas } from "../components/pedido/StatusCelulas";
 import { dataHora, exportarCsv, hojeISO, inicioMesISO, lerNumero, moeda, numero, percentual } from "../utils/format";
 import { FINANCEIRO, FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
@@ -75,6 +76,41 @@ const moedaCurta = (v) => (Math.abs(v) >= 1000 ? `R$ ${numero(v / 1000, 1)} mil`
 
 // ---------------------------------------------------------------------------
 
+// Recebimentos: pedidos marcados como pago no período (data do pagamento).
+// Visão de caixa, separada da receita (que é pela data do pedido).
+function Recebimentos({ pagos }) {
+  if (!pagos) return null;
+  return (
+    <section>
+      <h2 className="text-lg font-semibold">Recebimentos do período</h2>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Pedidos marcados como <b>pago</b> dentro do período, pela data do pagamento, não importa quando o pedido foi tirado nem se já foi expedido. É a visão de caixa: não altera a receita nem a meta.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard titulo="Recebido no período" valor={moeda(pagos.valor)} detalhe={`${pagos.pedidos} ${pagos.pedidos === 1 ? "pedido marcado" : "pedidos marcados"} como pago`} />
+        <MetricCard titulo="Taxas de pagamento" valor={moeda(pagos.taxas)} detalhe="Dos pedidos recebidos" />
+        <MetricCard titulo="Recebido líquido" valor={moeda(pagos.liquido)} detalhe="Recebido menos taxas de pagamento" />
+        <MetricCard titulo="De pedidos de antes do período" valor={moeda(pagos.deAntes)} detalhe={`${moeda(pagos.doPeriodo)} de pedidos tirados no período`} />
+      </div>
+      {pagos.porForma.length > 0 && (
+        <Card className="mt-3 p-4">
+          <p className="mb-2 text-sm font-semibold">Recebido por forma de pagamento</p>
+          <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
+            {pagos.porForma.map((f) => (
+              <div key={f.forma} className="flex justify-between gap-3 border-b border-border py-1 text-sm">
+                <span>
+                  {nomeForma(f.forma)} <span className="text-xs text-muted-foreground">({f.pedidos})</span>
+                </span>
+                <span className="font-medium">{moeda(f.valor)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </section>
+  );
+}
+
 function Resumo({ periodo }) {
   const [d, setD] = useState(null);
   const [modo, setModo] = useState("bruta");
@@ -115,25 +151,9 @@ function Resumo({ periodo }) {
         </div>
       )}
 
-      <section>
-        <h2 className="text-lg font-semibold">Pedidos por dia da semana</h2>
-        <p className="mb-3 text-sm text-muted-foreground">Quantidade, receita bruta e receita líquida dos pedidos criados no período selecionado (menos cancelados), pelo dia em que foram tirados.</p>
-        <Card className="h-80 p-4">
-          <ResponsiveContainer>
-            <ComposedChart data={d.semana}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="dia" tick={{ fontSize: 12 }} />
-              <YAxis yAxisId="q" tick={{ fontSize: 12 }} allowDecimals={false} />
-              <YAxis yAxisId="v" orientation="right" tick={{ fontSize: 11 }} tickFormatter={moedaCurta} width={90} />
-              <Tooltip formatter={(v, n) => (n === "Pedidos" ? v : moeda(v))} />
-              <Legend />
-              <Bar yAxisId="q" dataKey="pedidos" name="Pedidos" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
-              <Line yAxisId="v" dataKey="bruta" name="Receita bruta" stroke={ROSA} strokeWidth={2} dot />
-              <Line yAxisId="v" dataKey="liquida" name="Receita líquida" stroke={VERDE} strokeWidth={2} dot />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </Card>
-      </section>
+      <Recebimentos pagos={d.pagos} />
+
+      <GraficoResumo d={d} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-4">
