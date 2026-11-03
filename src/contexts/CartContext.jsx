@@ -5,6 +5,14 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 const CartContext = createContext({});
 const CHAVE = "girakids_carrinho";
 
+// Máximo de pacotes que cabem no estoque (por encomenda não tem limite). O
+// servidor reconfere o estoque ao finalizar o pedido.
+// eslint-disable-next-line react-refresh/only-export-components
+export const limitePacotes = (produto) => {
+  if (produto?.modoVenda === "ENCOMENDA" || produto?.estoque == null) return Infinity;
+  return Math.floor(Math.max(0, Number(produto.estoque)) / Math.max(1, Number(produto.unidadesPacote || 1)));
+};
+
 const ler = () => {
   try {
     return JSON.parse(localStorage.getItem(CHAVE) || "[]");
@@ -26,7 +34,7 @@ export function CartProvider({ children }) {
 
   const definirQuantidade = (produto, quantidade) => {
     setItens((atuais) => {
-      const q = Math.max(0, Math.round(Number(quantidade) || 0));
+      const q = Math.min(limitePacotes(produto), Math.max(0, Math.round(Number(quantidade) || 0)));
       const existente = atuais.find((i) => i.produto.id === produto.id);
       if (!q) return atuais.filter((i) => i.produto.id !== produto.id);
       if (existente) {

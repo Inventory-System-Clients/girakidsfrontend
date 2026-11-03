@@ -5,7 +5,7 @@ import api from "../services/api";
 import Carrossel from "../components/Carrossel";
 import BannerCarrossel, { useLayoutBanner } from "../components/BannerCarrossel";
 import { Visualizador } from "../components/pedido/Fotos";
-import { useCart } from "../contexts/CartContext";
+import { limitePacotes, useCart } from "../contexts/CartContext";
 import { Badge, Button, Card, Dialog, Skeleton, cx, useToast } from "../components/ui";
 import { moeda, moedaUnitaria } from "../utils/format";
 
@@ -36,7 +36,7 @@ function Quantidade({ produto }) {
         onChange={(e) => definirQuantidade(produto, e.target.value.replace(/\D/g, ""))}
         aria-label="Quantidade"
       />
-      <button className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" disabled={!produto.disponivel} onClick={() => definirQuantidade(produto, q + 1)} aria-label="Aumentar">
+      <button className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" disabled={!produto.disponivel || q >= limitePacotes(produto)} onClick={() => definirQuantidade(produto, q + 1)} aria-label="Aumentar">
         <Plus className="h-4 w-4" />
       </button>
     </div>

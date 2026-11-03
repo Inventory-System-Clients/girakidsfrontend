@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { useCart } from "../contexts/CartContext";
+import { limitePacotes, useCart } from "../contexts/CartContext";
 import { Button, Popover, cx } from "./ui";
 import { moeda } from "../utils/format";
 import { useAlertasRecebimentos } from "./recebimentos/comum";
@@ -104,7 +104,7 @@ function CarrinhoDrawer({ aberto, onFechar }) {
                   {quantidade === 1 ? <Trash2 className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
                 </button>
                 <span className="w-7 text-center text-sm">{quantidade}</span>
-                <button className="rounded border p-1" onClick={() => definirQuantidade(produto, quantidade + 1)} aria-label="Aumentar">
+                <button className="rounded border p-1 disabled:opacity-30" disabled={quantidade >= limitePacotes(produto)} onClick={() => definirQuantidade(produto, quantidade + 1)} aria-label="Aumentar">
                   <Plus className="h-3.5 w-3.5" />
                 </button>
               </div>
