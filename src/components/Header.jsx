@@ -123,7 +123,6 @@ function CarrinhoDrawer({ aberto, onFechar }) {
             <Button
               variant="success"
               className="flex-1"
-              disabled={!itens.length}
               onClick={() => {
                 onFechar();
                 navigate("/checkout");
@@ -214,7 +213,7 @@ export function Header() {
             {quantidade ? `${quantidade} ${quantidade === 1 ? "item" : "itens"}` : "Carrinho Vazio"}
           </button>
           <button
-            onClick={() => (quantidade ? navigate("/checkout") : setCarrinhoAberto(true))}
+            onClick={() => navigate("/checkout")}
             className={cx(
               "flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white transition",
               quantidade ? "bg-emerald-500 hover:bg-emerald-600" : "bg-emerald-300",

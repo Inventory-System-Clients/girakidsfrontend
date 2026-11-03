@@ -53,12 +53,31 @@ function CarregarPedido({ onCarregado }) {
   const toast = useToast();
   const [codigo, setCodigo] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [resultados, setResultados] = useState(null);
+  const termo = codigo.trim();
+  const porNome = termo.length >= 2 && !/^\d+$/.test(termo);
 
-  const buscar = async () => {
-    if (!codigo.trim()) return;
+  // Nome do cliente: lista os pedidos dele para escolher.
+  useEffect(() => {
+    if (!porNome) return undefined;
+    let ativo = true;
+    const t = setTimeout(() => {
+      api
+        .get("/pedidos/carregar", { params: { busca: termo } })
+        .then(({ data }) => ativo && setResultados(data))
+        .catch(() => ativo && setResultados([]));
+    }, 300);
+    return () => {
+      ativo = false;
+      clearTimeout(t);
+    };
+  }, [termo, porNome]);
+
+  const buscar = async (id) => {
+    if (!id && (!termo || porNome)) return false;
     setCarregando(true);
     try {
-      const { data: pedido } = await api.get(`/pedidos/codigo/${codigo.trim()}`);
+      const { data: pedido } = await api.get(id ? `/pedidos/${id}` : `/pedidos/codigo/${termo}`);
       if (!pedido.itens.length) throw new Error("Este pedido não possui itens.");
       const ids = pedido.itens.map((i) => i.produtoId).filter(Boolean);
       const { data: produtos } = await api.get("/produtos/busca", { params: { limite: 200, busca: "" } }).catch(() => ({ data: [] }));
@@ -85,8 +104,10 @@ function CarregarPedido({ onCarregado }) {
         titulo: disponiveis.length < pedido.itens.length ? "Pedido parcialmente carregado" : "Pedido carregado com sucesso",
         descricao: `${disponiveis.length} item(ns) do ${pedido.tipo === "ORCAMENTO" ? "orçamento" : "pedido"} ${pedido.numeroFormatado}.`,
       });
+      return true;
     } catch (error) {
       toast({ titulo: "Erro ao carregar pedido", descricao: mensagemErro(error), tipo: "erro" });
+      return false;
     } finally {
       setCarregando(false);
     }
@@ -102,14 +123,43 @@ function CarregarPedido({ onCarregado }) {
       }
     >
       {(fechar) => (
-        <div className="w-72 p-2">
-          <p className="mb-2 text-sm text-muted-foreground">Digite o código de um pedido anterior para replicar os itens no carrinho.</p>
+        <div className="w-80 p-2">
+          <p className="mb-2 text-sm text-muted-foreground">Digite o código ou o nome do cliente de um pedido anterior para replicar os itens no carrinho.</p>
           <div className="flex gap-2">
-            <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: 63037 ou 0065" onKeyDown={(e) => e.key === "Enter" && buscar().then(fechar)} />
-            <Button loading={carregando} onClick={() => buscar().then(fechar)}>
+            <Input autoFocus value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: 63037, 0065 ou Maria" onKeyDown={(e) => e.key === "Enter" && buscar().then((ok) => ok && fechar())} />
+            <Button loading={carregando} disabled={porNome} onClick={() => buscar().then((ok) => ok && fechar())}>
               Carregar
             </Button>
           </div>
+          {porNome && (
+            <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-border">
+              {resultados == null ? (
+                <p className="p-3 text-center text-xs text-muted-foreground">Buscando...</p>
+              ) : !resultados.length ? (
+                <p className="p-3 text-center text-xs text-muted-foreground">Nenhum pedido encontrado para esse nome.</p>
+              ) : (
+                resultados.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    disabled={carregando}
+                    className="block w-full border-b border-border px-3 py-2 text-left text-sm last:border-0 hover:bg-muted disabled:opacity-50"
+                    onClick={() => buscar(r.id).then((ok) => ok && fechar())}
+                  >
+                    <span className="flex justify-between gap-2">
+                      <span className="font-semibold">
+                        {r.tipo === "ORCAMENTO" ? "Orçamento" : "Pedido"} {r.numeroFormatado}
+                      </span>
+                      <span className="font-medium">{moeda(r.total)}</span>
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {r.clienteNome || "Sem cliente"} · {new Date(r.createdAt).toLocaleDateString("pt-BR")} · {r.quantidadeItens} item(ns){r.statusVendas === "CANCELADO" ? " · cancelado" : ""}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
       )}
     </Popover>
