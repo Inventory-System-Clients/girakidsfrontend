@@ -32,10 +32,13 @@ export function CartProvider({ children }) {
     }
   }, [itens]);
 
+  // Item "liberado" (admin lançou sem estoque) não tem limite: o estoque fica
+  // negativo até a mercadoria chegar.
   const definirQuantidade = (produto, quantidade) => {
     setItens((atuais) => {
-      const q = Math.min(limitePacotes(produto), Math.max(0, Math.round(Number(quantidade) || 0)));
       const existente = atuais.find((i) => i.produto.id === produto.id);
+      const limite = existente?.liberado ? Infinity : limitePacotes(produto);
+      const q = Math.min(limite, Math.max(0, Math.round(Number(quantidade) || 0)));
       if (!q) return atuais.filter((i) => i.produto.id !== produto.id);
       if (existente) {
         return atuais.map((i) => (i.produto.id === produto.id ? { ...i, quantidade: q } : i));
@@ -43,6 +46,17 @@ export function CartProvider({ children }) {
       return [...atuais, { produto, quantidade: q, precoUnitario: null }];
     });
   };
+
+  const liberarSemEstoque = (produto, quantidade) => {
+    const q = Math.max(1, Math.round(Number(quantidade) || 0));
+    setItens((atuais) =>
+      atuais.some((i) => i.produto.id === produto.id)
+        ? atuais.map((i) => (i.produto.id === produto.id ? { ...i, quantidade: q, liberado: true } : i))
+        : [...atuais, { produto, quantidade: q, precoUnitario: null, liberado: true }],
+    );
+  };
+
+  const liberadoDe = (produtoId) => Boolean(itens.find((i) => i.produto.id === produtoId)?.liberado);
 
   const definirPreco = (produtoId, precoUnitario) =>
     setItens((atuais) => atuais.map((i) => (i.produto.id === produtoId ? { ...i, precoUnitario } : i)));
@@ -64,7 +78,7 @@ export function CartProvider({ children }) {
 
   return (
     <CartContext.Provider
-      value={{ itens, definirQuantidade, definirPreco, quantidadeDe, limpar, carregar, ...resumo }}
+      value={{ itens, definirQuantidade, liberarSemEstoque, liberadoDe, definirPreco, quantidadeDe, limpar, carregar, ...resumo }}
     >
       {children}
     </CartContext.Provider>

@@ -337,7 +337,7 @@ export default function Checkout({ modo = "pedido" }) {
       const corpo = {
         clienteId,
         cliente,
-        itens: itens.map((i) => ({ produtoId: i.produto.id, quantidade: i.quantidade, precoUnitario: i.precoUnitario })),
+        itens: itens.map((i) => ({ produtoId: i.produto.id, quantidade: i.quantidade, precoUnitario: i.precoUnitario, liberadoSemEstoque: Boolean(i.liberado) })),
         metodoEnvio: metodoEnvio || null,
         desconto: descontoNum,
         freteAdicional: adicionalNum,
@@ -611,13 +611,14 @@ export default function Checkout({ modo = "pedido" }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {itens.map(({ produto, quantidade, precoUnitario }) => {
+                  {itens.map(({ produto, quantidade, precoUnitario, liberado }) => {
                     const preco = precoUnitario != null && precoUnitario !== "" ? lerNumero(precoUnitario) : produto.precoVenda;
                     return (
                       <tr key={produto.id} className="border-b border-border/60">
                         <td className="py-3">
                           <p className="font-medium">{produto.nome}</p>
                           <p className="text-xs text-muted-foreground">{produto.categoria}</p>
+                          {liberado && <p className="text-xs font-medium text-amber-700">Lançado sem estoque (fica negativo até chegar)</p>}
                         </td>
                         <td className="text-center">
                           <input className="input h-8 w-16 text-center" value={quantidade} onChange={(e) => definirQuantidade(produto, e.target.value.replace(/\D/g, "") || 0)} />

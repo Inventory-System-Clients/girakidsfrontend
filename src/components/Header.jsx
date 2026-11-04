@@ -87,7 +87,7 @@ function CarrinhoDrawer({ aberto, onFechar }) {
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-3">
           {!itens.length && <p className="py-10 text-center text-muted-foreground">Carrinho vazio</p>}
-          {itens.map(({ produto, quantidade }) => (
+          {itens.map(({ produto, quantidade, liberado }) => (
             <div key={produto.id} className="flex gap-3 border-b border-border py-3">
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
                 {produto.imagemUrl && <img src={produto.imagemUrl} alt="" className="h-full w-full object-cover" />}
@@ -104,7 +104,7 @@ function CarrinhoDrawer({ aberto, onFechar }) {
                   {quantidade === 1 ? <Trash2 className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
                 </button>
                 <span className="w-7 text-center text-sm">{quantidade}</span>
-                <button className="rounded border p-1 disabled:opacity-30" disabled={quantidade >= limitePacotes(produto)} onClick={() => definirQuantidade(produto, quantidade + 1)} aria-label="Aumentar">
+                <button className="rounded border p-1 disabled:opacity-30" disabled={!liberado && quantidade >= limitePacotes(produto)} onClick={() => definirQuantidade(produto, quantidade + 1)} aria-label="Aumentar">
                   <Plus className="h-3.5 w-3.5" />
                 </button>
               </div>

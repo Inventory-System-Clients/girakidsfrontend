@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Link2, Maximize2, Package, PlayCircle, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
 import api from "../services/api";
 import Carrossel from "../components/Carrossel";
 import BannerCarrossel, { useLayoutBanner } from "../components/BannerCarrossel";
 import { Visualizador } from "../components/pedido/Fotos";
+import { useAuth } from "../contexts/AuthContext";
 import { limitePacotes, useCart } from "../contexts/CartContext";
-import { Badge, Button, Card, Dialog, Skeleton, cx, useToast } from "../components/ui";
+import { Badge, Button, Card, Dialog, Input, Skeleton, cx, useToast } from "../components/ui";
 import { moeda, moedaUnitaria } from "../utils/format";
 
 const POR_PAGINA = 12;
@@ -21,10 +22,92 @@ const imagensDoProduto = (p) => {
   return p.imagemUrl && p.imagemUrl !== imagens[0] ? [p.imagemUrl, ...imagens] : imagens;
 };
 
+const SEGURAR_MS = 3000;
+
+// Admin segura o "+" de um item sem estoque (ou no limite) para lançar mesmo
+// assim: o estoque fica negativo e a próxima entrada desconta o que faltou.
+function LancarSemEstoque({ produto, quantidadeAtual, onFechar }) {
+  const { liberarSemEstoque } = useCart();
+  const toast = useToast();
+  const [quantidade, setQuantidade] = useState(String(quantidadeAtual + 1));
+  const pacote = Math.max(1, Number(produto.unidadesPacote) || 1);
+  const q = Math.max(1, Number(quantidade) || 0);
+  const estoque = Number(produto.estoque || 0);
+  const ficara = estoque - q * pacote;
+  const confirmar = () => {
+    liberarSemEstoque(produto, q);
+    toast({ titulo: "Lançado sem estoque", descricao: `${produto.nome}: ${q * pacote} un. no carrinho.` });
+    onFechar();
+  };
+  return (
+    <Dialog
+      aberto
+      onFechar={onFechar}
+      titulo="Lançar sem estoque"
+      descricao={`${produto.nome} — estoque atual: ${estoque} un.`}
+      tamanho="sm"
+      rodape={
+        <>
+          <Button variant="outline" onClick={onFechar}>Cancelar</Button>
+          <Button onClick={confirmar}>Lançar no carrinho</Button>
+        </>
+      }
+    >
+      <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+        <label className="block text-sm font-medium">
+          Quantidade{pacote > 1 ? " (pacotes)" : ""}
+          <Input autoFocus className="mt-1" inputMode="numeric" value={quantidade} onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && confirmar()} />
+        </label>
+        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+          São {q * pacote} un.{ficara < 0 ? ` O estoque vai ficar em ${ficara} un.` : ""} quando o pedido for liberado. Quando a mercadoria chegar, a entrada desconta o que ficou faltando e o estoque mostra a quantidade real.
+        </p>
+      </div>
+    </Dialog>
+  );
+}
+
 function Quantidade({ produto }) {
-  const { quantidadeDe, definirQuantidade } = useCart();
+  const { quantidadeDe, definirQuantidade, liberadoDe } = useCart();
+  const { usuario } = useAuth();
+  const toast = useToast();
   const q = quantidadeDe(produto.id);
+  const liberado = liberadoDe(produto.id);
   const unidades = q * (Number(produto.unidadesPacote) || 1);
+  const admin = usuario?.role === "ADMIN";
+  const noLimite = !liberado && (!produto.disponivel || q >= limitePacotes(produto));
+  const [segurando, setSegurando] = useState(false);
+  const [lancar, setLancar] = useState(false);
+  const timer = useRef(null);
+  const disparou = useRef(false);
+
+  const comecar = () => {
+    if (!admin || !noLimite) return;
+    disparou.current = false;
+    setSegurando(true);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      disparou.current = true;
+      setSegurando(false);
+      setLancar(true);
+    }, SEGURAR_MS);
+  };
+  const soltar = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    setSegurando(false);
+  };
+  const aumentar = () => {
+    if (disparou.current) {
+      disparou.current = false;
+      return;
+    }
+    if (noLimite) {
+      toast({ titulo: "Sem estoque", descricao: "Segure o + por 3 segundos para lançar sem estoque.", tipo: "aviso" });
+      return;
+    }
+    definirQuantidade(produto, q + 1);
+  };
+
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <div className="mx-auto flex w-full max-w-40 items-center justify-between rounded-full border border-border bg-white px-1 py-1">
@@ -38,15 +121,31 @@ function Quantidade({ produto }) {
           onChange={(e) => definirQuantidade(produto, e.target.value.replace(/\D/g, ""))}
           aria-label="Quantidade"
         />
-        <button className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" disabled={!produto.disponivel || q >= limitePacotes(produto)} onClick={() => definirQuantidade(produto, q + 1)} aria-label="Aumentar">
+        <button
+          className={cx("rounded-full p-1.5 text-muted-foreground select-none hover:bg-muted disabled:opacity-30", admin && noLimite && "opacity-40", segurando && "bg-amber-100 text-amber-700 opacity-100")}
+          style={{ WebkitTouchCallout: "none" }}
+          disabled={!admin && noLimite}
+          onPointerDown={comecar}
+          onPointerUp={soltar}
+          onPointerLeave={soltar}
+          onPointerCancel={soltar}
+          onContextMenu={(e) => admin && e.preventDefault()}
+          onClick={aumentar}
+          aria-label="Aumentar"
+        >
           <Plus className="h-4 w-4" />
         </button>
       </div>
-      {q > 0 && (
-        <p className="mt-1.5 text-center text-xs font-medium text-emerald-700">
-          {unidades} {unidades === 1 ? "unidade" : "unidades"} no carrinho
-        </p>
+      {segurando ? (
+        <p className="mt-1.5 text-center text-xs font-medium text-amber-700">Continue segurando para lançar sem estoque...</p>
+      ) : (
+        q > 0 && (
+          <p className={cx("mt-1.5 text-center text-xs font-medium", liberado ? "text-amber-700" : "text-emerald-700")}>
+            {unidades} {unidades === 1 ? "unidade" : "unidades"} no carrinho{liberado ? " (sem estoque)" : ""}
+          </p>
+        )
       )}
+      {lancar && <LancarSemEstoque produto={produto} quantidadeAtual={q} onFechar={() => setLancar(false)} />}
     </div>
   );
 }
