@@ -12,6 +12,17 @@ import { Button, Dialog, Input } from "../../components/ui";
 
 // O VIPP pediu captcha: mostra a imagem da sessão aberta pelo servidor, a
 // pessoa digita o código e a ação que estava sendo feita continua sozinha.
+const URL_SITE_VIPP = "https://vipp-novo.visualset.com.br/vipp/inicio/index.php";
+
+// Enquanto a integração com o VIPP falhar, a postagem pode ser feita à mão.
+function LinkSiteVipp() {
+  return (
+    <a href={URL_SITE_VIPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-primary underline">
+      Fazer a postagem direto no site do VIPP ↗
+    </a>
+  );
+}
+
 function LoginVipp({ onFechar, onEntrou }) {
   const [imagem, setImagem] = useState("");
   const [codigo, setCodigo] = useState("");
@@ -82,6 +93,9 @@ function LoginVipp({ onFechar, onEntrou }) {
           className="uppercase tracking-widest"
         />
         {erro && <p className="text-sm text-red-600">{erro}</p>}
+        <p className="border-t border-border pt-3 text-sm text-muted-foreground">
+          Não conseguiu entrar? <LinkSiteVipp />
+        </p>
       </div>
     </Dialog>
   );
@@ -164,6 +178,8 @@ export function Correios() {
   const [temMais, setTemMais] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState("");
+  // O erro veio do VIPP (cotar, gravar ou baixar PDFs): mostra o link do site.
+  const [erroVipp, setErroVipp] = useState(false);
 
   const [pedido, setPedido] = useState(null);
   const [abrindoId, setAbrindoId] = useState("");
@@ -192,6 +208,7 @@ export function Correios() {
       setTemMais(Boolean(response.data.temMais));
     } catch (err) {
       setError(err.response?.data?.error || "Erro ao buscar pedidos da loja.");
+      setErroVipp(false);
     } finally {
       setBuscando(false);
     }
@@ -221,6 +238,7 @@ export function Correios() {
       }, 50);
     } catch (err) {
       setError(err.response?.data?.error || "Erro ao abrir o pedido.");
+      setErroVipp(false);
     } finally {
       setAbrindoId("");
     }
@@ -275,6 +293,7 @@ export function Correios() {
     } catch (err) {
       if (err.response?.status === 428) return setLoginVipp(() => cotar);
       setError(err.response?.data?.error || "Erro ao cotar o frete no VIPP.");
+      setErroVipp(true);
     } finally {
       setCotando(false);
     }
@@ -300,6 +319,7 @@ export function Correios() {
       }
       if (err.response?.status === 428) return setLoginVipp(() => () => gravar(forcar));
       setError(err.response?.data?.error || "Erro ao gravar a postagem no VIPP.");
+      setErroVipp(err.response?.status !== 409);
     } finally {
       setGravando(false);
     }
@@ -314,6 +334,7 @@ export function Correios() {
     } catch (err) {
       if (err.response?.status === 428) return setLoginVipp(() => () => baixarDeNovo(postagem));
       setError(err.response?.data?.error || "Erro ao baixar os PDFs.");
+      setErroVipp(true);
     } finally {
       setBaixandoPdfId("");
     }
@@ -344,7 +365,19 @@ export function Correios() {
 
         {error && (
           <div className="mb-6">
-            <AlertBox type="error" message={error} onClose={() => setError("")} />
+            <AlertBox
+              type="error"
+              message={error}
+              onClose={() => {
+                setError("");
+                setErroVipp(false);
+              }}
+            />
+            {erroVipp && (
+              <p className="mt-2 text-sm">
+                Enquanto a integração não volta: <LinkSiteVipp />
+              </p>
+            )}
           </div>
         )}
 
