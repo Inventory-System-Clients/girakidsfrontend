@@ -24,21 +24,29 @@ const imagensDoProduto = (p) => {
 function Quantidade({ produto }) {
   const { quantidadeDe, definirQuantidade } = useCart();
   const q = quantidadeDe(produto.id);
+  const unidades = q * (Number(produto.unidadesPacote) || 1);
   return (
-    <div className="mx-auto flex w-full max-w-40 items-center justify-between rounded-full border border-border bg-white px-1 py-1" onClick={(e) => e.stopPropagation()}>
-      <button className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" disabled={!q} onClick={() => definirQuantidade(produto, q - 1)} aria-label="Diminuir">
-        <Minus className="h-4 w-4" />
-      </button>
-      <input
-        className="w-12 border-0 bg-transparent text-center text-sm font-semibold outline-none"
-        inputMode="numeric"
-        value={q}
-        onChange={(e) => definirQuantidade(produto, e.target.value.replace(/\D/g, ""))}
-        aria-label="Quantidade"
-      />
-      <button className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" disabled={!produto.disponivel || q >= limitePacotes(produto)} onClick={() => definirQuantidade(produto, q + 1)} aria-label="Aumentar">
-        <Plus className="h-4 w-4" />
-      </button>
+    <div onClick={(e) => e.stopPropagation()}>
+      <div className="mx-auto flex w-full max-w-40 items-center justify-between rounded-full border border-border bg-white px-1 py-1">
+        <button className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" disabled={!q} onClick={() => definirQuantidade(produto, q - 1)} aria-label="Diminuir">
+          <Minus className="h-4 w-4" />
+        </button>
+        <input
+          className="w-12 border-0 bg-transparent text-center text-sm font-semibold outline-none"
+          inputMode="numeric"
+          value={q}
+          onChange={(e) => definirQuantidade(produto, e.target.value.replace(/\D/g, ""))}
+          aria-label="Quantidade"
+        />
+        <button className="rounded-full p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30" disabled={!produto.disponivel || q >= limitePacotes(produto)} onClick={() => definirQuantidade(produto, q + 1)} aria-label="Aumentar">
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+      {q > 0 && (
+        <p className="mt-1.5 text-center text-xs font-medium text-emerald-700">
+          {unidades} {unidades === 1 ? "unidade" : "unidades"} no carrinho
+        </p>
+      )}
     </div>
   );
 }

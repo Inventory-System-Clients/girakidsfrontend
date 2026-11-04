@@ -249,6 +249,9 @@ export default function Checkout({ modo = "pedido" }) {
   const [mescla, setMescla] = useState([]);
   const [usarCredito, setUsarCredito] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  // Banco/maquininha recusou a cobrança: o pedido não foi salvo e a tela
+  // pergunta se tenta de novo ou troca a forma de pagamento.
+  const [falhaPagamento, setFalhaPagamento] = useState(null);
   const [orcamentoGerado, setOrcamentoGerado] = useState(null);
 
   useEffect(() => {
@@ -350,6 +353,7 @@ export default function Checkout({ modo = "pedido" }) {
         transportadoraCotacao: metodoEnvio === "TRANSPORTADORA" ? cotacao.numero : null,
         transportadoraCotacaoCom: metodoEnvio === "TRANSPORTADORA" ? cotacao.com : null,
         observacoes,
+        maquininhaId: maquininhaIntegrada ? maquininhaEscolhida || null : null,
       };
       // Cliente novo: a conta é criada com os dados do pedido (senha padrão).
       const avisarCadastro = (data) => {
@@ -374,14 +378,9 @@ export default function Checkout({ modo = "pedido" }) {
       } else {
         const { data } = await api.post("/pedidos", corpo);
         if (tiraPedido) avisarCadastro(data);
-        // Envia a cobrança para a maquininha escolhida.
+        // A cobrança já foi para a maquininha junto com o pedido.
         if (maquininhaIntegrada && maquininhaEscolhida) {
-          try {
-            await api.post(`/pagamentos/pedidos/${data.id}/maquininha`, { maquininhaId: maquininhaEscolhida });
-            toast({ titulo: "Cobrança enviada para a maquininha", descricao: "Peça para o cliente pagar nela; o pedido é confirmado sozinho." });
-          } catch (error) {
-            toast({ titulo: "Pedido salvo, mas a maquininha não recebeu", descricao: `${mensagemErro(error)} Envie de novo pela tela do pedido.`, tipo: "aviso" });
-          }
+          toast({ titulo: "Cobrança enviada para a maquininha", descricao: "Peça para o cliente pagar nela; o pedido é confirmado sozinho." });
         }
         limpar();
         if (tiraPedido) escolherCliente(null);
@@ -390,7 +389,8 @@ export default function Checkout({ modo = "pedido" }) {
         navigate(`/pagamento/${data.id}`);
       }
     } catch (error) {
-      toast({ titulo: orcamento ? "Erro ao criar orçamento" : "Erro ao finalizar pedido", descricao: mensagemErro(error), tipo: "erro" });
+      if (!orcamento && error.response?.status === 402) setFalhaPagamento(mensagemErro(error));
+      else toast({ titulo: orcamento ? "Erro ao criar orçamento" : "Erro ao finalizar pedido", descricao: mensagemErro(error), tipo: "erro" });
       if (pedidoPeloGiraldo) avisarResultadoGiraldo({ ok: false, motivo: mensagemErro(error) });
     } finally {
       setEnviando(false);
@@ -540,6 +540,41 @@ export default function Checkout({ modo = "pedido" }) {
 
   return (
     <div className="container-app py-8">
+      <Dialog
+        aberto={Boolean(falhaPagamento)}
+        onFechar={() => setFalhaPagamento(null)}
+        titulo="O pagamento não deu certo"
+        descricao="O pedido ainda não foi salvo e o carrinho continua igual."
+        tamanho="sm"
+        rodape={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFalhaPagamento(null);
+                document.getElementById("forma-pagamento")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            >
+              Alterar forma de pagamento
+            </Button>
+            <Button
+              loading={enviando}
+              onClick={() => {
+                setFalhaPagamento(null);
+                enviar();
+              }}
+            >
+              Tentar novamente
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">
+          Não foi possível gerar a cobrança{config?.nome ? ` em ${config.nome}` : ""}. Deseja tentar novamente ou escolher outra forma de pagamento?
+        </p>
+        <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{falhaPagamento}</p>
+      </Dialog>
+
       <PageHeader titulo={orcamento ? "Geração de Orçamentos" : "Checkout"} subtitulo={orcamento ? "Monte pedidos administrativos, gere o PDF e salve o código para reaproveitar no checkout." : "Revise seu pedido e finalize a compra"} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
@@ -704,7 +739,7 @@ export default function Checkout({ modo = "pedido" }) {
             )}
           </Card>
 
-          <Card className="p-5">
+          <Card id="forma-pagamento" className="p-5">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
               <Wallet className="h-5 w-5 text-primary" /> Forma de Pagamento
             </h2>
