@@ -320,7 +320,8 @@ export default function Checkout({ modo = "pedido" }) {
   // Admin: volumes/peso usados na cotação da Braspress (vazio = calculado pelo sistema).
   const admin = usuario?.role === "ADMIN";
   const [braspressAjuste, setBraspressAjuste] = useState(null);
-  const [editandoBraspress, setEditandoBraspress] = useState({ volumes: "", pesoKg: "" });
+  const BRASPRESS_VAZIO = { volumes: "", pesoKg: "", altura: "", largura: "", comprimento: "" };
+  const [editandoBraspress, setEditandoBraspress] = useState(BRASPRESS_VAZIO);
   const [cotando, setCotando] = useState(false);
   const [opcoes, setOpcoes] = useState(null);
   const [forma, setForma] = useState(reab?.formaPagamento || (interno ? "A_DEFINIR" : escolhasGiraldo.formaPagamento || ""));
@@ -808,7 +809,9 @@ export default function Checkout({ modo = "pedido" }) {
                   </p>
                   {o.metodo === "BRASPRESS" && o.disponivel && (
                     <p className="text-xs text-muted-foreground">
-                      {o.volumes} {o.volumes === 1 ? "volume" : "volumes"} · {String(o.pesoKg).replace(".", ",")} kg{o.ajustado ? " (ajustado)" : ""}
+                      {o.volumes} {o.volumes === 1 ? "volume" : "volumes"} · {String(o.pesoKg).replace(".", ",")} kg
+                      {o.caixa && ` · ${["altura", "largura", "comprimento"].map((c) => String(o.caixa[c]).replace(".", ",")).join(" × ")} cm (A × L × C)`}
+                      {o.ajustado ? " (ajustado)" : ""}
                     </p>
                   )}
                 </button>
@@ -816,7 +819,7 @@ export default function Checkout({ modo = "pedido" }) {
             </div>
             {admin && metodoEnvio === "BRASPRESS" && (
               <div className="mt-4 rounded-lg border border-dashed border-primary/40 bg-primary-soft/50 p-3">
-                <p className="text-sm font-medium">Cotar a Braspress com outro volume e peso</p>
+                <p className="text-sm font-medium">Cotar a Braspress com outro volume, peso ou medida da caixa</p>
                 <p className="mb-2 text-xs text-muted-foreground">Visível apenas para administradores. Deixe em branco para usar o calculado pelo sistema.</p>
                 <div className="flex flex-wrap items-end gap-2">
                   <Field label="Volumes">
@@ -837,11 +840,28 @@ export default function Checkout({ modo = "pedido" }) {
                       onChange={(e) => setEditandoBraspress((a) => ({ ...a, pesoKg: e.target.value.replace(/[^\d,.]/g, "") }))}
                     />
                   </Field>
+                  {[
+                    ["altura", "Altura (cm)"],
+                    ["largura", "Largura (cm)"],
+                    ["comprimento", "Compr. (cm)"],
+                  ].map(([campo, rotulo]) => (
+                    <Field key={campo} label={rotulo}>
+                      <Input
+                        className="w-24"
+                        inputMode="decimal"
+                        placeholder={String(opcaoEnvio?.caixa?.[campo] ?? "").replace(".", ",")}
+                        value={editandoBraspress[campo] || ""}
+                        onChange={(e) => setEditandoBraspress((a) => ({ ...a, [campo]: e.target.value.replace(/[^\d,.]/g, "") }))}
+                      />
+                    </Field>
+                  ))}
                   <Button
                     size="sm"
                     loading={cotando}
-                    disabled={!editandoBraspress.volumes && !editandoBraspress.pesoKg}
-                    onClick={() => setBraspressAjuste({ volumes: editandoBraspress.volumes || null, pesoKg: editandoBraspress.pesoKg || null })}
+                    disabled={!Object.values(editandoBraspress).some(Boolean)}
+                    onClick={() =>
+                      setBraspressAjuste(Object.fromEntries(Object.entries(editandoBraspress).map(([c, v]) => [c, v || null])))
+                    }
                   >
                     Cotar de novo
                   </Button>
@@ -851,7 +871,7 @@ export default function Checkout({ modo = "pedido" }) {
                       variant="outline"
                       onClick={() => {
                         setBraspressAjuste(null);
-                        setEditandoBraspress({ volumes: "", pesoKg: "" });
+                        setEditandoBraspress(BRASPRESS_VAZIO);
                       }}
                     >
                       Usar o calculado
