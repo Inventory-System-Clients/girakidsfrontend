@@ -343,7 +343,7 @@ export default function Checkout({ modo = "pedido" }) {
     const t = setTimeout(async () => {
       setCotando(true);
       try {
-        const { data } = await api.post("/checkout/frete", { cep, uf: cliente.estado, itens: itensApi });
+        const { data } = await api.post("/checkout/frete", { cep, uf: cliente.estado, itens: itensApi, documento: cliente.documento });
         setFrete(data);
       } catch {
         setFrete(null);
@@ -353,7 +353,7 @@ export default function Checkout({ modo = "pedido" }) {
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cliente.cep, cliente.estado, chaveItens]);
+  }, [cliente.cep, cliente.estado, cliente.documento, chaveItens]);
 
   const opcaoEnvio = frete?.opcoes?.find((o) => o.metodo === metodoEnvio);
   const valorFrete = opcaoEnvio?.disponivel ? Number(opcaoEnvio.valor || 0) : 0;
@@ -779,7 +779,7 @@ export default function Checkout({ modo = "pedido" }) {
             <div className="grid gap-2 sm:grid-cols-2">
               {(frete?.opcoes || [
                 { metodo: "RETIRAR_LOCAL", nome: "Retirar no local", descricao: "Retire em nossa loja", valor: 0, disponivel: true },
-                { metodo: "TRANSPORTADORA", nome: "Transportadora", descricao: "O time de vendas entrará em contato", disponivel: true },
+                { metodo: "TRANSPORTADORA", nome: "Outra transportadora", descricao: "O time de vendas entrará em contato", disponivel: true },
               ]).map((o) => (
                 <button
                   key={o.metodo}
