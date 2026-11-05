@@ -17,7 +17,9 @@ import {
   Upload,
   Send,
   Smartphone,
+  Copy,
 } from "lucide-react";
+import QRCode from "qrcode";
 import api, { enviarArquivo, mensagemErro } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { Badge, Button, Checkbox, Dialog, Field, Input, RowMenu, Select, Textarea, useConfirm, useToast } from "../ui";
@@ -343,6 +345,7 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
   );
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [salvo, setSalvo] = useState(null);
   const toast = useToast();
   const cartao = ["CREDITO_ONLINE", "CREDITO_LINK", "LINK_PAGAMENTO", "MAQUININHA"].includes(forma);
 
@@ -356,13 +359,18 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
         motivo,
       });
       toast({ titulo: "Forma de pagamento alterada", descricao: `Novo total: ${moeda(d.total)}` });
-      onFeito(d);
+      // PIX/cartão online ou maquininha em pedido não pago: cobra ali mesmo.
+      if (d.statusFinanceiro !== "PAGO" && (ONLINE.includes(forma) || forma === "MAQUININHA")) setSalvo(d);
+      else onFeito(d);
     } catch (error) {
       toast({ titulo: "Erro ao alterar", descricao: mensagemErro(error), tipo: "erro" });
     } finally {
       setEnviando(false);
     }
   };
+
+  if (salvo?.formaPagamento === "MAQUININHA") return <MaquininhaDialog pedido={salvo} onFechar={() => onFeito(salvo)} onFeito={onFeito} />;
+  if (salvo) return <CobrancaOnlineDialog pedido={salvo} onFeito={onFeito} />;
 
   return (
     <Dialog
@@ -412,6 +420,121 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </Field>
       </div>
+    </Dialog>
+  );
+}
+
+const ONLINE = ["PIX_ONLINE", "CREDITO_ONLINE", "DEBITO_ONLINE"];
+
+// Depois de trocar para PIX/cartão online: gera a cobrança com o novo total,
+// mostra o QR Code (ou o link) e espera o banco confirmar.
+function CobrancaOnlineDialog({ pedido: inicial, onFeito }) {
+  const toast = useToast();
+  const [pedido, setPedido] = useState(inicial);
+  const [gerando, setGerando] = useState(true);
+  const [erro, setErro] = useState("");
+  const [qrImagem, setQrImagem] = useState("");
+  const pago = pedido.statusFinanceiro === "PAGO";
+  const pix = pedido.formaPagamento === "PIX_ONLINE";
+
+  const gerar = async () => {
+    setGerando(true);
+    setErro("");
+    try {
+      const { data: d } = await api.post(`/pagamentos/pedidos/${pedido.id}/cobranca`);
+      setPedido(d);
+    } catch (error) {
+      setErro(mensagemErro(error));
+    } finally {
+      setGerando(false);
+    }
+  };
+
+  useEffect(() => {
+    gerar();
+  }, []);
+
+  useEffect(() => {
+    if (!pedido.pagamentoQrCode) return setQrImagem("");
+    QRCode.toDataURL(pedido.pagamentoQrCode, { width: 280, margin: 1 })
+      .then(setQrImagem)
+      .catch(() => setQrImagem(""));
+  }, [pedido.pagamentoQrCode]);
+
+  useEffect(() => {
+    if (gerando || erro || pago || !pedido.pagamentoReferencia) return undefined;
+    const t = setInterval(async () => {
+      try {
+        const { data: d } = await api.post(`/pagamentos/pedidos/${pedido.id}/consultar`);
+        setPedido(d);
+        if (d.statusFinanceiro === "PAGO") toast({ titulo: "Pagamento aprovado!", descricao: `Pedido ${d.numeroFormatado} pago e liberado.` });
+      } catch {
+        /* tenta de novo no próximo ciclo */
+      }
+    }, 8000);
+    return () => clearInterval(t);
+  }, [gerando, erro, pago, pedido.id, pedido.pagamentoReferencia, toast]);
+
+  return (
+    <Dialog
+      aberto
+      onFechar={() => onFeito(pedido)}
+      titulo={`${pix ? "PIX" : "Pagamento online"} · Pedido ${pedido.numeroFormatado}`}
+      descricao={`Valor: ${moeda(pedido.total)}`}
+      rodape={
+        <>
+          {!pago && !gerando && (
+            <Button variant="outline" onClick={gerar}>
+              Gerar {pix ? "novo PIX" : "novo link"}
+            </Button>
+          )}
+          <Button onClick={() => onFeito(pedido)}>{pago ? "Fechar" : "Fechar (continua aguardando)"}</Button>
+        </>
+      }
+    >
+      {pago ? (
+        <p className="flex items-center gap-2 font-semibold text-emerald-700">
+          <CheckCircle2 className="h-5 w-5" /> Pagamento aprovado. Pedido liberado para a expedição.
+        </p>
+      ) : gerando ? (
+        <p className="text-sm text-muted-foreground">Gerando a cobrança...</p>
+      ) : erro ? (
+        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Não foi possível gerar a cobrança: {erro}</p>
+      ) : (
+        <div className="space-y-3 text-center">
+          {pedido.pagamentoQrCode && (
+            <>
+              <p className="text-sm font-medium">Peça para o cliente pagar com o QR Code ou o copia e cola:</p>
+              {qrImagem && <img src={qrImagem} alt="QR Code PIX" className="mx-auto h-60 w-60 rounded-lg border border-border bg-white p-2" />}
+              <textarea readOnly className="input h-20 font-mono text-xs" value={pedido.pagamentoQrCode} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigator.clipboard.writeText(pedido.pagamentoQrCode).then(() => toast({ titulo: "Código copiado" }))}
+              >
+                <Copy className="h-4 w-4" /> Copiar código
+              </Button>
+            </>
+          )}
+          {pedido.pagamentoLink && (
+            <div className="flex flex-wrap justify-center gap-2">
+              <a href={pedido.pagamentoLink} target="_blank" rel="noreferrer">
+                <Button variant="outline" size="sm">
+                  <CreditCard className="h-4 w-4" /> Abrir {pix ? "PIX no banco" : "link de pagamento"}
+                </Button>
+              </a>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigator.clipboard.writeText(pedido.pagamentoLink).then(() => toast({ titulo: "Link copiado" }))}
+              >
+                <Copy className="h-4 w-4" /> Copiar link
+              </Button>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">Assim que o banco confirmar, o pedido fica pago e é liberado sozinho.</p>
+        </div>
+      )}
     </Dialog>
   );
 }
