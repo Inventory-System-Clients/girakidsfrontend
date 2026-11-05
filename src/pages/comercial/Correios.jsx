@@ -158,7 +158,8 @@ const baixarArquivos = (arquivos) => {
   arquivos.forEach((arquivo, indice) => {
     setTimeout(() => {
       const bytes = Uint8Array.from(atob(arquivo.base64), (c) => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      // A API dos Correios devolve a declaração de conteúdo em HTML.
+      const url = URL.createObjectURL(new Blob([bytes], { type: arquivo.mime || "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
       link.download = arquivo.nome;
@@ -292,7 +293,7 @@ export function Correios() {
       setServicoId(preferido?.id || "");
     } catch (err) {
       if (err.response?.status === 428) return setLoginVipp(() => cotar);
-      setError(err.response?.data?.error || "Erro ao cotar o frete no VIPP.");
+      setError(err.response?.data?.error || "Erro ao cotar o frete nos Correios.");
       setErroVipp(true);
     } finally {
       setCotando(false);
@@ -318,7 +319,7 @@ export function Correios() {
         setPedido((atual) => ({ ...atual, postagem: err.response.data.postagem }));
       }
       if (err.response?.status === 428) return setLoginVipp(() => () => gravar(forcar));
-      setError(err.response?.data?.error || "Erro ao gravar a postagem no VIPP.");
+      setError(err.response?.data?.error || "Erro ao gravar a postagem nos Correios.");
       setErroVipp(err.response?.status !== 409);
     } finally {
       setGravando(false);
@@ -359,7 +360,7 @@ export function Correios() {
       <main className="container-app px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title="Correios"
-          subtitle="Pedidos da loja Gira Kids → postagem no VIPP com etiqueta e declaração em PDF"
+          subtitle="Pedidos da loja Gira Kids → postagem nos Correios com etiqueta e declaração em PDF"
           icon="📮"
         />
 
@@ -526,7 +527,7 @@ export function Correios() {
             {pedido.postagem && !resultado && (
               <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                 <p className="font-bold text-emerald-900">
-                  ✅ Este pedido já foi postado no VIPP
+                  ✅ Este pedido já foi postado nos Correios
                 </p>
                 <p className="text-sm text-emerald-800 mt-1">
                   Etiqueta {pedido.postagem.etiqueta || "-"} · {pedido.postagem.servico}
@@ -551,7 +552,7 @@ export function Correios() {
             {resultado && (
               <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                 <p className="font-bold text-emerald-900">
-                  ✅ Postagem gravada no VIPP — etiqueta {resultado.etiqueta || "-"}
+                  ✅ Postagem gravada nos Correios — etiqueta {resultado.etiqueta || "-"}
                 </p>
                 <p className="text-sm text-emerald-800 mt-1">
                   {resultado.servico?.nome} · {formatarMoeda(resultado.servico?.valor)}.{" "}
@@ -661,7 +662,7 @@ export function Correios() {
                     onClick={cotar}
                     disabled={cotando || !dimensoesPreenchidas}
                   >
-                    {cotando ? "Cotando no VIPP..." : "💲 Cotar frete"}
+                    {cotando ? "Cotando nos Correios..." : "💲 Cotar frete"}
                   </button>
                 </div>
 
@@ -703,7 +704,7 @@ export function Correios() {
                       disabled={!servicoEscolhido || gravando}
                       onClick={() => setConfirmarGravar(true)}
                     >
-                      {gravando ? "Gravando no VIPP..." : "📦 Gravar e baixar PDFs"}
+                      {gravando ? "Gravando nos Correios..." : "📦 Gravar e baixar PDFs"}
                     </button>
                   </div>
                 )}
@@ -717,7 +718,7 @@ export function Correios() {
         isOpen={confirmarGravar}
         onClose={() => setConfirmarGravar(false)}
         onConfirm={() => gravar(Boolean(pedido?.postagem))}
-        title={pedido?.postagem ? "⚠️ Postar de novo?" : "Gravar postagem no VIPP"}
+        title={pedido?.postagem ? "⚠️ Postar de novo?" : "Gravar postagem nos Correios"}
         message={
           pedido?.postagem
             ? `Este pedido JÁ foi postado (etiqueta ${pedido.postagem.etiqueta || "-"}). Gravar de novo cria OUTRA pré-postagem nos Correios. Continuar?`
