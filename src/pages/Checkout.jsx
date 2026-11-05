@@ -78,6 +78,10 @@ export const itensDoPedido = async (pedido, { manterPreco = false } = {}) => {
 
 const valorCampo = (v) => (Number(v) > 0 ? String(Number(v)).replace(".", ",") : "");
 
+// Braspress (admin): uma linha por tamanho de caixa; vazio = calculado.
+const LINHA_CAIXA_VAZIA = { volumes: "", altura: "", largura: "", comprimento: "" };
+const braspressVazio = (calculadas) => ({ pesoKg: "", caixas: (calculadas?.length ? calculadas : [null]).map(() => ({ ...LINHA_CAIXA_VAZIA })) });
+
 // Tudo que o checkout precisa para reabrir o pedido como ele estava.
 // eslint-disable-next-line react-refresh/only-export-components
 export const dadosReabertura = (p) => {
@@ -320,8 +324,7 @@ export default function Checkout({ modo = "pedido" }) {
   // Admin: volumes/peso usados na cotação da Braspress (vazio = calculado pelo sistema).
   const admin = usuario?.role === "ADMIN";
   const [braspressAjuste, setBraspressAjuste] = useState(null);
-  const BRASPRESS_VAZIO = { volumes: "", pesoKg: "", altura: "", largura: "", comprimento: "" };
-  const [editandoBraspress, setEditandoBraspress] = useState(BRASPRESS_VAZIO);
+  const [editandoBraspress, setEditandoBraspress] = useState(braspressVazio());
   const [cotando, setCotando] = useState(false);
   const [opcoes, setOpcoes] = useState(null);
   const [forma, setForma] = useState(reab?.formaPagamento || (interno ? "A_DEFINIR" : escolhasGiraldo.formaPagamento || ""));
@@ -361,6 +364,11 @@ export default function Checkout({ modo = "pedido" }) {
   }, [cliente.cep, cliente.estado, cliente.documento, chaveItens, JSON.stringify(braspressAjuste)]);
 
   const opcaoEnvio = frete?.opcoes?.find((o) => o.metodo === metodoEnvio);
+  // Sem ajuste manual, o quadro abre com uma linha por tamanho calculado.
+  const qtdCalculadas = opcaoEnvio?.calculadas?.length || 0;
+  useEffect(() => {
+    if (!braspressAjuste) setEditandoBraspress(braspressVazio(opcaoEnvio?.calculadas));
+  }, [qtdCalculadas]);
   const valorFrete = opcaoEnvio?.disponivel ? Number(opcaoEnvio.valor || 0) : 0;
   const descontoNum = interno ? Math.min(subtotal, lerNumero(desconto)) : 0;
   const adicionalNum = interno ? lerNumero(freteAdicional) : 0;
@@ -810,7 +818,10 @@ export default function Checkout({ modo = "pedido" }) {
                   {o.metodo === "BRASPRESS" && o.disponivel && (
                     <p className="text-xs text-muted-foreground">
                       {o.volumes} {o.volumes === 1 ? "volume" : "volumes"} · {String(o.pesoKg).replace(".", ",")} kg
-                      {o.caixa && ` · ${["altura", "largura", "comprimento"].map((c) => String(o.caixa[c]).replace(".", ",")).join(" × ")} cm (A × L × C)`}
+                      {o.caixas?.length > 0 &&
+                        ` · ${o.caixas
+                          .map((c) => `${c.volumes}× ${["altura", "largura", "comprimento"].map((m) => String(c[m]).replace(".", ",")).join(" × ")}`)
+                          .join(" + ")} cm (A × L × C)`}
                       {o.ajustado ? " (ajustado)" : ""}
                     </p>
                   )}
@@ -819,19 +830,65 @@ export default function Checkout({ modo = "pedido" }) {
             </div>
             {admin && metodoEnvio === "BRASPRESS" && (
               <div className="mt-4 rounded-lg border border-dashed border-primary/40 bg-primary-soft/50 p-3">
-                <p className="text-sm font-medium">Cotar a Braspress com outro volume, peso ou medida da caixa</p>
-                <p className="mb-2 text-xs text-muted-foreground">Visível apenas para administradores. Deixe em branco para usar o calculado pelo sistema.</p>
-                <div className="flex flex-wrap items-end gap-2">
-                  <Field label="Volumes">
-                    <Input
-                      className="w-24"
-                      inputMode="numeric"
-                      placeholder={String(opcaoEnvio?.volumes ?? "")}
-                      value={editandoBraspress.volumes}
-                      onChange={(e) => setEditandoBraspress((a) => ({ ...a, volumes: e.target.value.replace(/\D/g, "") }))}
-                    />
-                  </Field>
-                  <Field label="Peso (kg)">
+                <p className="text-sm font-medium">Cotar a Braspress com outros volumes, medidas ou peso</p>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Uma linha por tamanho de caixa: quantos volumes têm aquela medida (A × L × C, em cm). Use + para outro tamanho. Campo em branco usa o
+                  calculado pelo sistema. Visível apenas para administradores.
+                </p>
+                <div className="space-y-2">
+                  {editandoBraspress.caixas.map((linha, n) => {
+                    const calculada = opcaoEnvio?.calculadas?.[n];
+                    const mudar = (campo, valor) =>
+                      setEditandoBraspress((a) => ({ ...a, caixas: a.caixas.map((l, i) => (i === n ? { ...l, [campo]: valor } : l)) }));
+                    return (
+                      <div key={n} className="flex flex-wrap items-end gap-2">
+                        <Field label={n === 0 ? "Volumes" : ""}>
+                          <Input
+                            className="w-20"
+                            inputMode="numeric"
+                            placeholder={String(calculada?.volumes ?? 1)}
+                            value={linha.volumes}
+                            onChange={(e) => mudar("volumes", e.target.value.replace(/\D/g, ""))}
+                          />
+                        </Field>
+                        {[
+                          ["altura", "Altura (cm)"],
+                          ["largura", "Largura (cm)"],
+                          ["comprimento", "Compr. (cm)"],
+                        ].map(([campo, rotulo]) => (
+                          <Field key={campo} label={n === 0 ? rotulo : ""}>
+                            <Input
+                              className="w-24"
+                              inputMode="decimal"
+                              placeholder={String((calculada || opcaoEnvio?.calculadas?.[0])?.[campo] ?? "").replace(".", ",")}
+                              value={linha[campo]}
+                              onChange={(e) => mudar(campo, e.target.value.replace(/[^\d,.]/g, ""))}
+                            />
+                          </Field>
+                        ))}
+                        {editandoBraspress.caixas.length > 1 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            title="Remover este tamanho"
+                            onClick={() => setEditandoBraspress((a) => ({ ...a, caixas: a.caixas.filter((_, i) => i !== n) }))}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditandoBraspress((a) => ({ ...a, caixas: [...a.caixas, { ...LINHA_CAIXA_VAZIA }] }))}
+                  >
+                    <Plus className="h-4 w-4" /> Outro tamanho de caixa
+                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap items-end gap-2">
+                  <Field label="Peso total (kg)">
                     <Input
                       className="w-28"
                       inputMode="decimal"
@@ -840,27 +897,14 @@ export default function Checkout({ modo = "pedido" }) {
                       onChange={(e) => setEditandoBraspress((a) => ({ ...a, pesoKg: e.target.value.replace(/[^\d,.]/g, "") }))}
                     />
                   </Field>
-                  {[
-                    ["altura", "Altura (cm)"],
-                    ["largura", "Largura (cm)"],
-                    ["comprimento", "Compr. (cm)"],
-                  ].map(([campo, rotulo]) => (
-                    <Field key={campo} label={rotulo}>
-                      <Input
-                        className="w-24"
-                        inputMode="decimal"
-                        placeholder={String(opcaoEnvio?.caixa?.[campo] ?? "").replace(".", ",")}
-                        value={editandoBraspress[campo] || ""}
-                        onChange={(e) => setEditandoBraspress((a) => ({ ...a, [campo]: e.target.value.replace(/[^\d,.]/g, "") }))}
-                      />
-                    </Field>
-                  ))}
                   <Button
                     size="sm"
                     loading={cotando}
-                    disabled={!Object.values(editandoBraspress).some(Boolean)}
                     onClick={() =>
-                      setBraspressAjuste(Object.fromEntries(Object.entries(editandoBraspress).map(([c, v]) => [c, v || null])))
+                      setBraspressAjuste({
+                        pesoKg: editandoBraspress.pesoKg || null,
+                        caixas: editandoBraspress.caixas.map((l) => Object.fromEntries(Object.entries(l).map(([c, v]) => [c, v || null]))),
+                      })
                     }
                   >
                     Cotar de novo
@@ -871,7 +915,7 @@ export default function Checkout({ modo = "pedido" }) {
                       variant="outline"
                       onClick={() => {
                         setBraspressAjuste(null);
-                        setEditandoBraspress(BRASPRESS_VAZIO);
+                        setEditandoBraspress(braspressVazio(opcaoEnvio?.calculadas));
                       }}
                     >
                       Usar o calculado
