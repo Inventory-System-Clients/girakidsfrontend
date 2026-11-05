@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 // "Novo valor" que a equipe pode definir no checkout.
 const CartContext = createContext({});
 const CHAVE = "girakids_carrinho";
+// Pedido "Aguardando" reaberto no carrinho pela equipe (finalizar atualiza ele).
+const CHAVE_REABERTURA = "girakids_reabertura";
 
 // Máximo de pacotes que cabem no estoque (por encomenda não tem limite). O
 // servidor reconfere o estoque ao finalizar o pedido.
@@ -13,16 +15,17 @@ export const limitePacotes = (produto) => {
   return Math.floor(Math.max(0, Number(produto.estoque)) / Math.max(1, Number(produto.unidadesPacote || 1)));
 };
 
-const ler = () => {
+const ler = (chave = CHAVE, padrao = "[]") => {
   try {
-    return JSON.parse(localStorage.getItem(CHAVE) || "[]");
+    return JSON.parse(localStorage.getItem(chave) || padrao);
   } catch {
-    return [];
+    return JSON.parse(padrao);
   }
 };
 
 export function CartProvider({ children }) {
-  const [itens, setItens] = useState(ler);
+  const [itens, setItens] = useState(() => ler());
+  const [reabertura, setReabertura] = useState(() => ler(CHAVE_REABERTURA, "null"));
 
   useEffect(() => {
     try {
@@ -31,6 +34,21 @@ export function CartProvider({ children }) {
       // Sem armazenamento: o carrinho vale só nesta aba.
     }
   }, [itens]);
+
+  useEffect(() => {
+    try {
+      if (reabertura) localStorage.setItem(CHAVE_REABERTURA, JSON.stringify(reabertura));
+      else localStorage.removeItem(CHAVE_REABERTURA);
+    } catch {
+      // Sem armazenamento: a reabertura vale só nesta aba.
+    }
+  }, [reabertura]);
+
+  const reabrirPedido = (dados, novosItens) => {
+    setItens(novosItens);
+    setReabertura(dados);
+  };
+  const encerrarReabertura = () => setReabertura(null);
 
   // Item "liberado" (admin lançou sem estoque) não tem limite: o estoque fica
   // negativo até a mercadoria chegar.
@@ -78,7 +96,7 @@ export function CartProvider({ children }) {
 
   return (
     <CartContext.Provider
-      value={{ itens, definirQuantidade, liberarSemEstoque, liberadoDe, definirPreco, quantidadeDe, limpar, carregar, ...resumo }}
+      value={{ itens, definirQuantidade, liberarSemEstoque, liberadoDe, definirPreco, quantidadeDe, limpar, carregar, reabertura, reabrirPedido, encerrarReabertura, ...resumo }}
     >
       {children}
     </CartContext.Provider>

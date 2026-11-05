@@ -25,7 +25,8 @@ import PedidoDetalhes from "./PedidoDetalhes";
 import SeletorTransportadora from "../checkout/SeletorTransportadora";
 import { FotosUpload } from "./Fotos";
 import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
-import { EditorMescla } from "../../pages/Checkout";
+import { EditorMescla, dadosReabertura, itensDoPedido } from "../../pages/Checkout";
+import { useCart } from "../../contexts/CartContext";
 import { data, hojeISO, lerNumero, moeda } from "../../utils/format";
 import { FORMAS_PAGAMENTO, METODOS_ENVIO, nomeForma } from "../../utils/status";
 import { gerarPdfPedido } from "../../utils/pdf";
@@ -852,6 +853,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
   const [dialogo, setDialogo] = useState(null);
   const [verId, setVerId] = useState(null);
   const statusPag = useStatusPagamentos();
+  const { itens: carrinho, reabrirPedido } = useCart();
 
   const feito = (d, fechar = true) => {
     onAtualizado?.(d);
@@ -866,6 +868,25 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
   const comCompleto = async (nome) => {
     const { data: d } = await api.get(`/pedidos/${pedido.id}`);
     setDialogo({ nome, pedido: d });
+  };
+
+  // Pedido amarelo (aguardando, sem pagamento recebido) volta inteiro para o
+  // carrinho; os demais continuam na edição simples.
+  const editar = async () => {
+    try {
+      const { data: d } = await api.get(`/pedidos/${pedido.id}`);
+      const recebido = d.statusFinanceiro === "PAGO" || (d.parcelas || []).some((p) => p.status === "RECEBIDA");
+      if (d.statusVendas !== "AGUARDANDO" || d.estoqueBaixado || recebido) return setDialogo({ nome: "editar", pedido: d });
+      if (carrinho.length) {
+        const ok = await confirmar({ titulo: `Reabrir pedido ${d.numeroFormatado}?`, mensagem: "Os itens que estão no carrinho agora serão trocados pelos deste pedido.", confirmar: "Reabrir pedido" });
+        if (!ok) return;
+      }
+      reabrirPedido(dadosReabertura(d), await itensDoPedido(d, { manterPreco: true }));
+      toast({ titulo: `Reabrindo pedido ${d.numeroFormatado}`, descricao: "Edite no carrinho e finalize para atualizar o pedido." });
+      navigate("/checkout");
+    } catch (error) {
+      toast({ titulo: "Erro ao reabrir pedido", descricao: mensagemErro(error), tipo: "erro" });
+    }
   };
 
   const cancelar = async () => {
@@ -934,7 +955,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
         : [
             { label: "Ver pedido", icone: Eye, onClick: () => setVerId(pedido.id) },
             { label: "Baixar PDF", icone: FileDown, onClick: baixarPdf },
-            contexto === "vendas" && ativo && !expedido && pode("VENDAS") && { label: "Editar pedido", icone: Pencil, onClick: () => comCompleto("editar") },
+            contexto === "vendas" && ativo && !expedido && pode("VENDAS") && { label: "Editar pedido", icone: Pencil, onClick: editar },
             contexto === "vendas" && ativo && pedido.statusVendas === "AGUARDANDO" && financeiro && { label: "Liberar para expedição", icone: ClipboardCheck, cor: "font-semibold text-blue-700 hover:bg-blue-50", onClick: () => comCompleto("liberar") },
             contexto === "vendas" && ativo && pedido.statusFinanceiro === "AGUARDANDO_PAGAMENTO" && financeiro && {
               label: pedido.pendenciaStatus === "ABERTA" ? "Quitar pendência" : "Confirmar pagamento",

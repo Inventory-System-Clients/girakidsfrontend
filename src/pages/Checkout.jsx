@@ -48,6 +48,73 @@ const dadosDoUsuario = (u) => ({
   estado: u?.estado || "",
 });
 
+// Itens de um pedido/orçamento no formato do carrinho. manterPreco: reabertura
+// (preço combinado e liberação sem estoque continuam).
+// eslint-disable-next-line react-refresh/only-export-components
+export const itensDoPedido = async (pedido, { manterPreco = false } = {}) => {
+  const { data: produtos } = await api.get("/produtos/busca", { params: { limite: 200, busca: "" } }).catch(() => ({ data: [] }));
+  const porId = new Map(produtos.map((p) => [p.id, p]));
+  return pedido.itens
+    .filter((i) => i.produtoId)
+    .map((i) => {
+      const produto = porId.get(i.produtoId) || {
+        id: i.produtoId,
+        nome: i.nome,
+        sku: i.sku,
+        categoria: i.categoria,
+        imagemUrl: i.imagemUrl,
+        unidadesPacote: i.unidadesPacote,
+        precoVenda: i.precoUnitario,
+      };
+      const precoCombinado = manterPreco && Number(i.precoUnitario) !== Number(produto.precoVenda);
+      return {
+        produto,
+        quantidade: i.quantidade,
+        precoUnitario: precoCombinado ? String(i.precoUnitario).replace(".", ",") : null,
+        ...(manterPreco && i.liberadoSemEstoque ? { liberado: true } : {}),
+      };
+    });
+};
+
+const valorCampo = (v) => (Number(v) > 0 ? String(Number(v)).replace(".", ",") : "");
+
+// Tudo que o checkout precisa para reabrir o pedido como ele estava.
+// eslint-disable-next-line react-refresh/only-export-components
+export const dadosReabertura = (p) => {
+  const cliente = {
+    nome: p.clienteNome || "",
+    email: p.clienteEmail || "",
+    telefone: p.clienteTelefone || "",
+    documento: p.documento || "",
+    documentoTipo: p.documentoTipo || "CPF",
+    cep: p.cep || "",
+    rua: p.rua || "",
+    numero: p.numeroEndereco || "",
+    complemento: p.complemento || "",
+    bairro: p.bairro || "",
+    cidade: p.cidade || "",
+    estado: p.estado || "",
+  };
+  return {
+    pedidoId: p.id,
+    numeroFormatado: p.numeroFormatado,
+    clienteId: p.clienteId || null,
+    clienteUsuario: p.clienteId ? { id: p.clienteId, ...cliente, nome: cliente.nome } : null,
+    cliente,
+    metodoEnvio: p.metodoEnvio || "",
+    formaPagamento: p.formaPagamento || "",
+    parcelasCartao: p.parcelasCartao || 1,
+    composicaoPagamento: (p.composicaoPagamento || []).map((l) => ({ ...l, valor: valorCampo(l.valor) })),
+    usarCredito: Number(p.creditoUsado) > 0,
+    desconto: valorCampo(p.desconto),
+    freteAdicional: valorCampo(p.freteAdicional),
+    observacoes: p.observacoes || "",
+    transportadora: p.transportadoraId ? { id: p.transportadoraId, nome: p.transportadoraNome } : null,
+    transportadoraObs: p.transportadoraObs || "",
+    cotacao: { numero: p.transportadoraCotacao || "", com: p.transportadoraCotacaoCom || "" },
+  };
+};
+
 function CarregarPedido({ onCarregado }) {
   const { carregar } = useCart();
   const toast = useToast();
@@ -79,26 +146,9 @@ function CarregarPedido({ onCarregado }) {
     try {
       const { data: pedido } = await api.get(id ? `/pedidos/${id}` : `/pedidos/codigo/${termo}`);
       if (!pedido.itens.length) throw new Error("Este pedido não possui itens.");
-      const ids = pedido.itens.map((i) => i.produtoId).filter(Boolean);
-      const { data: produtos } = await api.get("/produtos/busca", { params: { limite: 200, busca: "" } }).catch(() => ({ data: [] }));
-      const porId = new Map(produtos.map((p) => [p.id, p]));
-      const disponiveis = pedido.itens.filter((i) => i.produtoId && ids.includes(i.produtoId));
+      const disponiveis = await itensDoPedido(pedido);
       if (!disponiveis.length) throw new Error("Nenhum item deste pedido está disponível no momento.");
-      carregar(
-        disponiveis.map((i) => ({
-          produto: porId.get(i.produtoId) || {
-            id: i.produtoId,
-            nome: i.nome,
-            sku: i.sku,
-            categoria: i.categoria,
-            imagemUrl: i.imagemUrl,
-            unidadesPacote: i.unidadesPacote,
-            precoVenda: i.precoUnitario,
-          },
-          quantidade: i.quantidade,
-          precoUnitario: null,
-        })),
-      );
+      carregar(disponiveis);
       onCarregado?.(pedido);
       toast({
         titulo: disponiveis.length < pedido.itens.length ? "Pedido parcialmente carregado" : "Pedido carregado com sucesso",
@@ -199,30 +249,49 @@ export function EditorMescla({ linhas, onChange, total, formas }) {
   );
 }
 
+// Aviso de pedido reaberto, com opção de desistir (o pedido fica como estava).
+function AvisoReabertura({ reabertura, onDesistir }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4">
+      <div>
+        <p className="font-semibold text-amber-900">Reabrindo pedido {reabertura.numeroFormatado}</p>
+        <p className="text-sm text-amber-800">Altere cliente, produtos, entrega e pagamento. Ao finalizar, o mesmo pedido é atualizado (mantém o número).</p>
+      </div>
+      <Button variant="outline" size="sm" onClick={onDesistir}>
+        Desistir da reabertura
+      </Button>
+    </div>
+  );
+}
+
 export default function Checkout({ modo = "pedido" }) {
   const orcamento = modo === "orcamento";
   const { usuario, interno, showroom, tiraPedido, atualizarUsuario } = useAuth();
-  const { itens, definirQuantidade, definirPreco, limpar, subtotal } = useCart();
+  const { itens, definirQuantidade, definirPreco, limpar, subtotal, reabertura, encerrarReabertura } = useCart();
   const navigate = useNavigate();
   const toast = useToast();
+  // Pedido amarelo reaberto pela equipe: a tela abre como ele estava e
+  // finalizar atualiza o mesmo pedido.
+  const reab = !orcamento && tiraPedido ? reabertura : null;
 
   // Equipe: cliente escolhido fica guardado na aba enquanto monta o carrinho
   // pelo catálogo (sessionStorage).
   const chaveCliente = `girakids_checkout_cliente_${modo}`;
   const [clienteSelecionado, setClienteSelecionado] = useState(() => {
     if (!tiraPedido) return null;
+    if (reab) return reab.clienteUsuario || null;
     try {
       return JSON.parse(sessionStorage.getItem(chaveCliente) || "null");
     } catch {
       return null;
     }
   });
-  const [cliente, setCliente] = useState(() => (tiraPedido ? dadosDoUsuario(clienteSelecionado || {}) : dadosDoUsuario(usuario)));
-  const [clienteId, setClienteId] = useState(() => clienteSelecionado?.id || null);
+  const [cliente, setCliente] = useState(() => (reab ? reab.cliente : tiraPedido ? dadosDoUsuario(clienteSelecionado || {}) : dadosDoUsuario(usuario)));
+  const [clienteId, setClienteId] = useState(() => (reab ? reab.clienteId : clienteSelecionado?.id || null));
   const [mostrarIA, setMostrarIA] = useState(false);
-  const [transportadora, setTransportadora] = useState(null);
-  const [transportadoraObs, setTransportadoraObs] = useState("");
-  const [cotacao, setCotacao] = useState({ numero: "", com: "" });
+  const [transportadora, setTransportadora] = useState(() => reab?.transportadora || null);
+  const [transportadoraObs, setTransportadoraObs] = useState(() => reab?.transportadoraObs || "");
+  const [cotacao, setCotacao] = useState(() => reab?.cotacao || { numero: "", com: "" });
 
   const escolherCliente = (u) => {
     setClienteSelecionado(u);
@@ -235,19 +304,25 @@ export default function Checkout({ modo = "pedido" }) {
       // sem armazenamento: vale só nesta tela
     }
   };
-  const [observacoes, setObservacoes] = useState("");
-  const [desconto, setDesconto] = useState("");
-  const [freteAdicional, setFreteAdicional] = useState("");
+  const desistirReabertura = () => {
+    limpar();
+    encerrarReabertura();
+    escolherCliente(null);
+    toast({ titulo: "Reabertura cancelada", descricao: "O pedido continua como estava." });
+  };
+  const [observacoes, setObservacoes] = useState(() => reab?.observacoes || "");
+  const [desconto, setDesconto] = useState(() => reab?.desconto || "");
+  const [freteAdicional, setFreteAdicional] = useState(() => reab?.freteAdicional || "");
   // Cliente que veio do Giraldo já chega com entrega/pagamento escolhidos.
   const escolhasGiraldo = interno ? {} : lerEscolhasGiraldo();
-  const [metodoEnvio, setMetodoEnvio] = useState(escolhasGiraldo.metodoEnvio || "");
+  const [metodoEnvio, setMetodoEnvio] = useState(reab?.metodoEnvio || escolhasGiraldo.metodoEnvio || "");
   const [frete, setFrete] = useState(null);
   const [cotando, setCotando] = useState(false);
   const [opcoes, setOpcoes] = useState(null);
-  const [forma, setForma] = useState(interno ? "A_DEFINIR" : escolhasGiraldo.formaPagamento || "");
-  const [parcelas, setParcelas] = useState(1);
-  const [mescla, setMescla] = useState([]);
-  const [usarCredito, setUsarCredito] = useState(false);
+  const [forma, setForma] = useState(reab?.formaPagamento || (interno ? "A_DEFINIR" : escolhasGiraldo.formaPagamento || ""));
+  const [parcelas, setParcelas] = useState(reab?.parcelasCartao || 1);
+  const [mescla, setMescla] = useState(reab?.composicaoPagamento || []);
+  const [usarCredito, setUsarCredito] = useState(Boolean(reab?.usarCredito));
   const [enviando, setEnviando] = useState(false);
   // Banco/maquininha recusou a cobrança: o pedido não foi salvo e a tela
   // pergunta se tenta de novo ou troca a forma de pagamento.
@@ -376,8 +451,12 @@ export default function Checkout({ modo = "pedido" }) {
         limpar();
         escolherCliente(null);
       } else {
-        const { data } = await api.post("/pedidos", corpo);
+        const { data } = reab ? await api.put(`/pedidos/${reab.pedidoId}/reabrir`, corpo) : await api.post("/pedidos", corpo);
         if (tiraPedido) avisarCadastro(data);
+        if (reab) {
+          encerrarReabertura();
+          toast({ titulo: `Pedido ${data.numeroFormatado} atualizado`, descricao: "As alterações substituíram o pedido reaberto." });
+        }
         // A cobrança já foi para a maquininha junto com o pedido.
         if (maquininhaIntegrada && maquininhaEscolhida) {
           toast({ titulo: "Cobrança enviada para a maquininha", descricao: "Peça para o cliente pagar nela; o pedido é confirmado sozinho." });
@@ -486,6 +565,7 @@ export default function Checkout({ modo = "pedido" }) {
         <PageHeader titulo={orcamento ? "Geração de Orçamentos" : "Checkout"} subtitulo="Comece pelo cliente: copie o último pedido dele, adicione o que ele costuma comprar ou cole a mensagem para a IA montar.">
           <CarregarPedido />
         </PageHeader>
+        {reab && <AvisoReabertura reabertura={reab} onDesistir={desistirReabertura} />}
         <Card className="space-y-5 p-5">
           <div>
             <p className="mb-2 text-sm font-semibold">1. Cliente</p>
@@ -576,6 +656,7 @@ export default function Checkout({ modo = "pedido" }) {
       </Dialog>
 
       <PageHeader titulo={orcamento ? "Geração de Orçamentos" : "Checkout"} subtitulo={orcamento ? "Monte pedidos administrativos, gere o PDF e salve o código para reaproveitar no checkout." : "Revise seu pedido e finalize a compra"} />
+      {reab && <AvisoReabertura reabertura={reab} onDesistir={desistirReabertura} />}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-6">
