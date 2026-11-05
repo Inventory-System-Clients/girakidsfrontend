@@ -31,6 +31,19 @@ const baixarPdf = (base64, nome) => {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
 
+// Arquivo TXT da nota para importar à mão na tela da NFeMail (lá ela fica
+// "Em digitação", sem transmitir, e mostra o erro se houver).
+const baixarTxt = (txt, nome) => {
+  const url = URL.createObjectURL(new Blob([txt], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = nome;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+};
+
 // Emissão automática da NF-e do pedido pela NFeMail: prévia com as regras da
 // Gira Kids (CFOP, ICMS, frete, pagamento), ajustes e emissão com DANFE.
 export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
@@ -121,6 +134,11 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
             <Button variant="outline" onClick={onFechar}>
               Cancelar
             </Button>
+            {nota?.txt && (
+              <Button variant="outline" disabled={carregando} onClick={() => baixarTxt(nota.txt, `NFe-pedido-${nota.pedido.numeroFormatado}.txt`)}>
+                Baixar arquivo TXT
+              </Button>
+            )}
             <Button loading={emitindo} disabled={bloqueada} onClick={emitir}>
               {emitindo ? "Emitindo e aguardando a SEFAZ..." : "Gravar, assinar e transmitir"}
             </Button>
