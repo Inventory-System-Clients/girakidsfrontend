@@ -317,6 +317,10 @@ export default function Checkout({ modo = "pedido" }) {
   const escolhasGiraldo = interno ? {} : lerEscolhasGiraldo();
   const [metodoEnvio, setMetodoEnvio] = useState(reab?.metodoEnvio || escolhasGiraldo.metodoEnvio || "");
   const [frete, setFrete] = useState(null);
+  // Admin: volumes/peso usados na cotação da Braspress (vazio = calculado pelo sistema).
+  const admin = usuario?.role === "ADMIN";
+  const [braspressAjuste, setBraspressAjuste] = useState(null);
+  const [editandoBraspress, setEditandoBraspress] = useState({ volumes: "", pesoKg: "" });
   const [cotando, setCotando] = useState(false);
   const [opcoes, setOpcoes] = useState(null);
   const [forma, setForma] = useState(reab?.formaPagamento || (interno ? "A_DEFINIR" : escolhasGiraldo.formaPagamento || ""));
@@ -343,7 +347,7 @@ export default function Checkout({ modo = "pedido" }) {
     const t = setTimeout(async () => {
       setCotando(true);
       try {
-        const { data } = await api.post("/checkout/frete", { cep, uf: cliente.estado, itens: itensApi, documento: cliente.documento });
+        const { data } = await api.post("/checkout/frete", { cep, uf: cliente.estado, itens: itensApi, documento: cliente.documento, braspressAjuste: admin ? braspressAjuste : null });
         setFrete(data);
       } catch {
         setFrete(null);
@@ -353,7 +357,7 @@ export default function Checkout({ modo = "pedido" }) {
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cliente.cep, cliente.estado, cliente.documento, chaveItens]);
+  }, [cliente.cep, cliente.estado, cliente.documento, chaveItens, JSON.stringify(braspressAjuste)]);
 
   const opcaoEnvio = frete?.opcoes?.find((o) => o.metodo === metodoEnvio);
   const valorFrete = opcaoEnvio?.disponivel ? Number(opcaoEnvio.valor || 0) : 0;
@@ -414,6 +418,7 @@ export default function Checkout({ modo = "pedido" }) {
         cliente,
         itens: itens.map((i) => ({ produtoId: i.produto.id, quantidade: i.quantidade, precoUnitario: i.precoUnitario, liberadoSemEstoque: Boolean(i.liberado) })),
         metodoEnvio: metodoEnvio || null,
+        braspressAjuste: admin && metodoEnvio === "BRASPRESS" ? braspressAjuste : null,
         desconto: descontoNum,
         freteAdicional: adicionalNum,
         formaPagamento: forma || "A_DEFINIR",
@@ -801,9 +806,60 @@ export default function Checkout({ modo = "pedido" }) {
                           ? "A combinar"
                           : `${moeda(o.valor)} · ${o.prazoDias} dias úteis${o.estimado ? " (estimado)" : ""}`}
                   </p>
+                  {o.metodo === "BRASPRESS" && o.disponivel && (
+                    <p className="text-xs text-muted-foreground">
+                      {o.volumes} {o.volumes === 1 ? "volume" : "volumes"} · {String(o.pesoKg).replace(".", ",")} kg{o.ajustado ? " (ajustado)" : ""}
+                    </p>
+                  )}
                 </button>
               ))}
             </div>
+            {admin && metodoEnvio === "BRASPRESS" && (
+              <div className="mt-4 rounded-lg border border-dashed border-primary/40 bg-primary-soft/50 p-3">
+                <p className="text-sm font-medium">Cotar a Braspress com outro volume e peso</p>
+                <p className="mb-2 text-xs text-muted-foreground">Visível apenas para administradores. Deixe em branco para usar o calculado pelo sistema.</p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <Field label="Volumes">
+                    <Input
+                      className="w-24"
+                      inputMode="numeric"
+                      placeholder={String(opcaoEnvio?.volumes ?? "")}
+                      value={editandoBraspress.volumes}
+                      onChange={(e) => setEditandoBraspress((a) => ({ ...a, volumes: e.target.value.replace(/\D/g, "") }))}
+                    />
+                  </Field>
+                  <Field label="Peso (kg)">
+                    <Input
+                      className="w-28"
+                      inputMode="decimal"
+                      placeholder={String(opcaoEnvio?.pesoKg ?? "").replace(".", ",")}
+                      value={editandoBraspress.pesoKg}
+                      onChange={(e) => setEditandoBraspress((a) => ({ ...a, pesoKg: e.target.value.replace(/[^\d,.]/g, "") }))}
+                    />
+                  </Field>
+                  <Button
+                    size="sm"
+                    loading={cotando}
+                    disabled={!editandoBraspress.volumes && !editandoBraspress.pesoKg}
+                    onClick={() => setBraspressAjuste({ volumes: editandoBraspress.volumes || null, pesoKg: editandoBraspress.pesoKg || null })}
+                  >
+                    Cotar de novo
+                  </Button>
+                  {braspressAjuste && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setBraspressAjuste(null);
+                        setEditandoBraspress({ volumes: "", pesoKg: "" });
+                      }}
+                    >
+                      Usar o calculado
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
             {interno && metodoEnvio === "TRANSPORTADORA" && (
               <div className="mt-4">
                 <SeletorTransportadora
