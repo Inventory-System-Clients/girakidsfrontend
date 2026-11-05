@@ -4,6 +4,19 @@ import { Badge, Button, Dialog, Field, Input, Select, Spinner, Textarea, useConf
 import { moeda } from "../../utils/format";
 
 const MOD_FRETE = { 0: "CIF (por conta do remetente)", 1: "FOB (por conta do destinatário)", 9: "Sem transporte (retirada)" };
+// Dados do cliente que a tela deixa completar quando faltam no pedido.
+const CAMPOS_CLIENTE = [
+  { campo: "documento", rotulo: "CPF/CNPJ" },
+  { campo: "nome", rotulo: "Nome / Razão social", largo: true },
+  { campo: "cep", rotulo: "CEP" },
+  { campo: "logradouro", rotulo: "Rua", largo: true },
+  { campo: "numero", rotulo: "Número" },
+  { campo: "complemento", rotulo: "Complemento" },
+  { campo: "bairro", rotulo: "Bairro" },
+  { campo: "cidade", rotulo: "Cidade" },
+  { campo: "uf", rotulo: "UF" },
+];
+
 const PAGAMENTOS = { "03": "Cartão de crédito (a prazo)", 20: "PIX (à vista)", 15: "Boleto bancário (a prazo)", 21: "Crédito em loja (a prazo / a definir)" };
 
 const baixarPdf = (base64, nome) => {
@@ -29,6 +42,8 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
   const [carregando, setCarregando] = useState(true);
   const [emitindo, setEmitindo] = useState(false);
   const [resultado, setResultado] = useState(null);
+  // Depois que faltou algo, os campos do cliente continuam abertos para editar.
+  const [completarCliente, setCompletarCliente] = useState(false);
 
   const chaveOpcoes = JSON.stringify(opcoes);
   useEffect(() => {
@@ -40,6 +55,7 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
         .then(({ data }) => {
           if (!ativo) return;
           setNota(data);
+          if (data.faltando?.length) setCompletarCliente(true);
           setErro("");
         })
         .catch((e) => ativo && setErro(mensagemErro(e)))
@@ -52,6 +68,7 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
   }, [pedidoId, chaveOpcoes]);
 
   const alterar = (campo, valor) => setOpcoes((atual) => ({ ...atual, [campo]: valor }));
+  const alterarCliente = (campo, valor) => setOpcoes((atual) => ({ ...atual, cliente: { ...atual.cliente, [campo]: valor } }));
   const vincular = (produtoId, codigo) => setOpcoes((atual) => ({ ...atual, vinculos: { ...atual.vinculos, [produtoId]: codigo } }));
 
   const emitir = async () => {
@@ -140,6 +157,28 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
                 <li key={a}>⚠️ {a}</li>
               ))}
             </ul>
+          )}
+
+          {completarCliente && (
+            <section className="rounded-md border border-amber-300 bg-amber-50 p-3">
+              <h3 className="mb-1 font-semibold text-amber-900">Complete os dados do cliente</h3>
+              <p className="mb-3 text-amber-800">O que você preencher aqui vai na nota e fica salvo no pedido ao emitir.</p>
+              <div className="grid gap-3 sm:grid-cols-4">
+                {CAMPOS_CLIENTE.map(({ campo, rotulo, largo }) => {
+                  const falta = nota.faltando?.includes(campo);
+                  const valor = opcoes.cliente?.[campo] ?? d[campo] ?? "";
+                  return (
+                    <Field key={campo} label={`${rotulo}${falta ? " *" : ""}`} className={largo ? "sm:col-span-2" : ""} erro={falta ? "Obrigatório" : undefined}>
+                      <Input
+                        value={valor}
+                        maxLength={campo === "uf" ? 2 : undefined}
+                        onChange={(e) => alterarCliente(campo, campo === "uf" ? e.target.value.toUpperCase() : e.target.value)}
+                      />
+                    </Field>
+                  );
+                })}
+              </div>
+            </section>
           )}
 
           <section>

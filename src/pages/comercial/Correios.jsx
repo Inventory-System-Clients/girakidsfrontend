@@ -8,6 +8,7 @@ import {
   ConfirmDialog,
 } from "../../components/comercial/UIComponents";
 import api from "../../services/api";
+import EmitirNotaDialog from "../../components/pedido/EmitirNotaDialog";
 
 const formatarMoeda = (valor) =>
   Number(valor || 0).toLocaleString("pt-BR", {
@@ -102,6 +103,8 @@ export function Correios() {
   const [confirmarGravar, setConfirmarGravar] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [baixandoPdfId, setBaixandoPdfId] = useState("");
+  // Nota fiscal do pedido aberto (a postagem vai com a NF).
+  const [emitirNota, setEmitirNota] = useState(false);
 
   const buscar = async (event) => {
     event?.preventDefault();
@@ -241,6 +244,7 @@ export function Correios() {
   return (
     <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
       <Navbar />
+      {emitirNota && pedido && <EmitirNotaDialog pedidoId={pedido.id} onFechar={() => setEmitirNota(false)} />}
 
       <main className="container-app px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
@@ -584,14 +588,23 @@ export function Correios() {
                       </label>
                     ))}
 
-                    <button
-                      type="button"
-                      className="btn-primary w-full py-3 mt-2"
-                      disabled={!servicoEscolhido || gravando}
-                      onClick={() => setConfirmarGravar(true)}
-                    >
-                      {gravando ? "Gravando nos Correios..." : "📦 Gravar e baixar PDFs"}
-                    </button>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        className="btn-secondary w-full py-3"
+                        onClick={() => setEmitirNota(true)}
+                      >
+                        🧾 Gerar NF
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary w-full py-3"
+                        disabled={!servicoEscolhido || gravando}
+                        onClick={() => setConfirmarGravar(true)}
+                      >
+                        {gravando ? "Gravando nos Correios..." : "📦 Gravar e baixar PDFs"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
