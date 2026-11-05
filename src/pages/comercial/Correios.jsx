@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Navbar } from "../../components/Header";
 import { Footer } from "../../components/Header";
 import {
@@ -7,99 +7,7 @@ import {
   Badge,
   ConfirmDialog,
 } from "../../components/comercial/UIComponents";
-import api, { mensagemErro } from "../../services/api";
-import { Button, Dialog, Input } from "../../components/ui";
-
-// O VIPP pediu captcha: mostra a imagem da sessão aberta pelo servidor, a
-// pessoa digita o código e a ação que estava sendo feita continua sozinha.
-const URL_SITE_VIPP = "https://vipp-novo.visualset.com.br/vipp/inicio/index.php";
-
-// Enquanto a integração com o VIPP falhar, a postagem pode ser feita à mão.
-function LinkSiteVipp() {
-  return (
-    <a href={URL_SITE_VIPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-primary underline">
-      Fazer a postagem direto no site do VIPP ↗
-    </a>
-  );
-}
-
-function LoginVipp({ onFechar, onEntrou }) {
-  const [imagem, setImagem] = useState("");
-  const [codigo, setCodigo] = useState("");
-  const [erro, setErro] = useState("");
-  const [enviando, setEnviando] = useState(false);
-
-  const buscarImagem = () =>
-    api
-      .post("/correios/vipp/captcha")
-      .then(({ data }) => setImagem(data.imagem))
-      .catch((e) => setErro(mensagemErro(e, "Não foi possível buscar a imagem do VIPP.")));
-
-  useEffect(() => {
-    buscarImagem();
-  }, []);
-
-  const trocar = () => {
-    setImagem("");
-    setCodigo("");
-    buscarImagem();
-  };
-
-  const entrar = async () => {
-    if (codigo.trim().length < 5) return setErro("Digite os 5 caracteres da imagem.");
-    setEnviando(true);
-    setErro("");
-    try {
-      await api.post("/correios/vipp/entrar", { captcha: codigo.trim() });
-      onEntrou();
-    } catch (e) {
-      setErro(mensagemErro(e, "Não foi possível entrar no VIPP."));
-      trocar();
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  return (
-    <Dialog
-      aberto
-      onFechar={onFechar}
-      titulo="Entrar no VIPP"
-      descricao="O VIPP pediu a confirmação de que não é um robô. Digite os caracteres da imagem; depois disso a sessão fica aberta para as próximas postagens."
-      tamanho="sm"
-      rodape={
-        <>
-          <Button variant="outline" onClick={onFechar}>Cancelar</Button>
-          <Button loading={enviando} disabled={!imagem} onClick={entrar}>Entrar e continuar</Button>
-        </>
-      }
-    >
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-[60px] w-[190px] items-center justify-center overflow-hidden rounded-md border border-border bg-white">
-            {imagem ? <img src={imagem} alt="Código de verificação do VIPP" className="h-[60px] w-[190px]" /> : <span className="text-xs text-muted-foreground">Carregando imagem...</span>}
-          </div>
-          <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={trocar} disabled={enviando}>
-            Trocar imagem
-          </button>
-        </div>
-        <Input
-          autoFocus
-          value={codigo}
-          maxLength={5}
-          onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-          onKeyDown={(e) => e.key === "Enter" && entrar()}
-          placeholder="Código da imagem"
-          className="uppercase tracking-widest"
-        />
-        {erro && <p className="text-sm text-red-600">{erro}</p>}
-        <p className="border-t border-border pt-3 text-sm text-muted-foreground">
-          Não conseguiu entrar? <LinkSiteVipp />
-        </p>
-      </div>
-    </Dialog>
-  );
-}
+import api from "../../services/api";
 
 const formatarMoeda = (valor) =>
   Number(valor || 0).toLocaleString("pt-BR", {
@@ -179,8 +87,6 @@ export function Correios() {
   const [temMais, setTemMais] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState("");
-  // O erro veio do VIPP (cotar, gravar ou baixar PDFs): mostra o link do site.
-  const [erroVipp, setErroVipp] = useState(false);
 
   const [pedido, setPedido] = useState(null);
   const [abrindoId, setAbrindoId] = useState("");
@@ -209,7 +115,6 @@ export function Correios() {
       setTemMais(Boolean(response.data.temMais));
     } catch (err) {
       setError(err.response?.data?.error || "Erro ao buscar pedidos da loja.");
-      setErroVipp(false);
     } finally {
       setBuscando(false);
     }
@@ -239,7 +144,6 @@ export function Correios() {
       }, 50);
     } catch (err) {
       setError(err.response?.data?.error || "Erro ao abrir o pedido.");
-      setErroVipp(false);
     } finally {
       setAbrindoId("");
     }
@@ -271,9 +175,6 @@ export function Correios() {
     parseNumero(largura) > 0 &&
     parseNumero(comprimento) > 0;
 
-  // Ação que estava sendo feita quando o VIPP pediu captcha.
-  const [loginVipp, setLoginVipp] = useState(null);
-
   const cotar = async () => {
     if (!dimensoesPreenchidas) {
       setError("Preencha peso, altura, largura e comprimento para cotar.");
@@ -292,9 +193,7 @@ export function Correios() {
         lista.find((s) => s.disponivel);
       setServicoId(preferido?.id || "");
     } catch (err) {
-      if (err.response?.status === 428) return setLoginVipp(() => cotar);
       setError(err.response?.data?.error || "Erro ao cotar o frete nos Correios.");
-      setErroVipp(true);
     } finally {
       setCotando(false);
     }
@@ -318,9 +217,7 @@ export function Correios() {
       if (err.response?.status === 409 && err.response.data?.postagem) {
         setPedido((atual) => ({ ...atual, postagem: err.response.data.postagem }));
       }
-      if (err.response?.status === 428) return setLoginVipp(() => () => gravar(forcar));
       setError(err.response?.data?.error || "Erro ao gravar a postagem nos Correios.");
-      setErroVipp(err.response?.status !== 409);
     } finally {
       setGravando(false);
     }
@@ -333,9 +230,7 @@ export function Correios() {
       const response = await api.get(`/correios/postagens/${postagem.id}/pdfs`);
       baixarArquivos(response.data.arquivos || []);
     } catch (err) {
-      if (err.response?.status === 428) return setLoginVipp(() => () => baixarDeNovo(postagem));
       setError(err.response?.data?.error || "Erro ao baixar os PDFs.");
-      setErroVipp(true);
     } finally {
       setBaixandoPdfId("");
     }
@@ -346,16 +241,6 @@ export function Correios() {
   return (
     <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
       <Navbar />
-      {loginVipp && (
-        <LoginVipp
-          onFechar={() => setLoginVipp(null)}
-          onEntrou={() => {
-            const continuar = loginVipp;
-            setLoginVipp(null);
-            continuar();
-          }}
-        />
-      )}
 
       <main className="container-app px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
@@ -366,19 +251,7 @@ export function Correios() {
 
         {error && (
           <div className="mb-6">
-            <AlertBox
-              type="error"
-              message={error}
-              onClose={() => {
-                setError("");
-                setErroVipp(false);
-              }}
-            />
-            {erroVipp && (
-              <p className="mt-2 text-sm">
-                Enquanto a integração não volta: <LinkSiteVipp />
-              </p>
-            )}
+            <AlertBox type="error" message={error} onClose={() => setError("")} />
           </div>
         )}
 
