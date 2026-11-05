@@ -434,9 +434,22 @@ export function Correios() {
                     : ""}
                 </p>
                 {resultado.errosPdf?.length > 0 && (
-                  <p className="text-sm text-amber-800 mt-2">
-                    ⚠️ {resultado.errosPdf.join(" ")} Use "Baixar de novo" no pedido.
-                  </p>
+                  <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+                    <p className="text-sm font-semibold text-amber-900">
+                      ⚠️ {resultado.arquivos?.some((a) => a.tipo === "etiqueta") ? "Um arquivo não veio." : "A etiqueta ainda não veio dos Correios."} A postagem já está gravada; não grave de novo.
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800">{resultado.errosPdf.join(" ")}</p>
+                    {resultado.postagemId && (
+                      <button
+                        type="button"
+                        className="btn-primary mt-2"
+                        disabled={baixandoPdfId === resultado.postagemId}
+                        onClick={() => baixarDeNovo({ id: resultado.postagemId })}
+                      >
+                        {baixandoPdfId === resultado.postagemId ? "Baixando..." : "⬇️ Baixar etiqueta de novo"}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
