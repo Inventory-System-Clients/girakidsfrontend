@@ -301,7 +301,17 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
           </section>
 
           <section>
-            <h3 className="mb-2 font-semibold">Produtos da nota</h3>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-semibold">Produtos da nota</h3>
+              <Button size="sm" variant={opcoes.usarValorReal ? "primary" : "outline"} onClick={() => alterar("usarValorReal", !opcoes.usarValorReal)}>
+                {opcoes.usarValorReal ? "Voltar ao valor da NFeMail" : "Usar valor real"}
+              </Button>
+            </div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              {opcoes.usarValorReal
+                ? "Valores reais do pedido no site (com desconto e crédito usado)."
+                : "Valores do cadastro de produtos da NFeMail × quantidade (sem o desconto do site)."}
+            </p>
             {nota.semVinculo.length > 0 && (
               <div className="mb-3 space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3">
                 <p className="text-amber-900">Escolha o produto da NFeMail para cada item (fica salvo para as próximas notas):</p>
@@ -340,7 +350,12 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
                     <td className="text-right">
                       {l.qCom} {l.unidade}
                     </td>
-                    <td className="text-right">{moeda(l.vProd)}</td>
+                    <td className="text-right">
+                      {moeda(l.vProd)}
+                      <span className="block text-xs text-muted-foreground">
+                        {l.origemValor === "NFEMAIL" ? `${moeda(l.vUnCom)}/${l.unidade} NFeMail · site ${moeda(l.valorSite)}` : "valor do site"}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
