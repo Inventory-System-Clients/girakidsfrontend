@@ -5,6 +5,44 @@ import { contemTexto } from "../../utils/format";
 import { Navbar } from "../../components/Header";
 import { Footer } from "../../components/Header";
 import { PageHeader, Modal } from "../../components/comercial/UIComponents";
+import EmitirNotaDialog from "../../components/pedido/EmitirNotaDialog";
+
+// Emissão automática: acha o pedido pelo número e abre a NF-e dele.
+function EmitirNFePorNumero({ onEmitida }) {
+  const [numero, setNumero] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [pedidoId, setPedidoId] = useState(null);
+  const abrir = async (event) => {
+    event.preventDefault();
+    if (!numero.trim()) return;
+    setBuscando(true);
+    setErro("");
+    try {
+      const { data } = await api.get(`/pedidos/codigo/${numero.trim()}`);
+      if (data.tipo !== "PEDIDO") throw new Error("Esse número é de um orçamento, não de um pedido.");
+      setPedidoId(data.id);
+    } catch (err) {
+      setErro(err.response?.data?.error || err.message || "Pedido não encontrado.");
+    } finally {
+      setBuscando(false);
+    }
+  };
+  return (
+    <form onSubmit={abrir} className="card mb-6">
+      <h2 className="text-lg font-bold text-gray-900">🧾 Emitir NF-e automática</h2>
+      <p className="mb-3 text-sm text-gray-600">Digite o número do pedido: a nota é montada com cliente, produtos, transporte e pagamento do próprio pedido e transmitida pela NFeMail.</p>
+      <div className="flex flex-wrap gap-2">
+        <input className="input-field w-48" inputMode="numeric" placeholder="Ex.: 70012" value={numero} onChange={(e) => setNumero(e.target.value.replace(/\D/g, ""))} />
+        <button type="submit" className="btn-primary" disabled={buscando}>
+          {buscando ? "Buscando..." : "Montar nota"}
+        </button>
+      </div>
+      {erro && <p className="mt-2 text-sm text-red-600">{erro}</p>}
+      {pedidoId && <EmitirNotaDialog pedidoId={pedidoId} onFechar={() => setPedidoId(null)} onEmitida={onEmitida} />}
+    </form>
+  );
+}
 
 const FRETE_OPTIONS = ["CIF", "FOB"];
 
@@ -350,6 +388,8 @@ export function PedidosNotasFiscais() {
             )}
           </div>
         )}
+
+        {abaAtiva === "cadastro" && <EmitirNFePorNumero />}
 
         {abaAtiva === "cadastro" && (
           <button

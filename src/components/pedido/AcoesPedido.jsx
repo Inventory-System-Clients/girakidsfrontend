@@ -22,6 +22,7 @@ import api, { enviarArquivo, mensagemErro } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { Badge, Button, Checkbox, Dialog, Field, Input, RowMenu, Select, Textarea, useConfirm, useToast } from "../ui";
 import PedidoDetalhes from "./PedidoDetalhes";
+import EmitirNotaDialog from "./EmitirNotaDialog";
 import SeletorTransportadora from "../checkout/SeletorTransportadora";
 import { FotosUpload } from "./Fotos";
 import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
@@ -973,6 +974,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
               onClick: () => comCompleto("maquininha"),
             },
             contexto === "vendas" && ativo && { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
+            contexto === "vendas" && ativo && pode("VENDAS", "FINANCEIRO", "COMERCIAL") && { label: "Emitir nota fiscal (NF-e)", icone: FileText, cor: "font-semibold text-blue-700 hover:bg-blue-50", onClick: () => setDialogo({ nome: "emitirNfe", pedido }) },
             contexto === "vendas" && ativo && { label: "Nota fiscal", icone: FileText, onClick: () => comCompleto("nota") },
             contexto === "vendas" && ativo && pode("COMERCIAL", "FINANCEIRO", "VENDAS") && { label: "Custo pós-venda", icone: HandCoins, onClick: () => setDialogo({ nome: "custo", pedido }) },
             contexto === "vendas" && ativo && !expedido && pode("VENDAS") && { label: "Cancelar Pedido", icone: Ban, perigo: true, onClick: cancelar },
@@ -993,6 +995,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
       {dialogo?.nome === "nota" && <NotaFiscalDialog {...props} />}
       {dialogo?.nome === "expedir" && <ExpedirDialog {...props} />}
       {dialogo?.nome === "editar" && <EditarPedidoDialog {...props} />}
+      {dialogo?.nome === "emitirNfe" && <EmitirNotaDialog pedidoId={dialogo.pedido.id} onFechar={() => setDialogo(null)} onEmitida={() => onAtualizado?.()} />}
       {dialogo?.nome === "custo" && <NovoCustoDialog pedido={dialogo.pedido} onFechar={() => setDialogo(null)} onSalvo={() => setDialogo(null)} />}
     </>
   );
