@@ -84,6 +84,22 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
   const alterarCliente = (campo, valor) => setOpcoes((atual) => ({ ...atual, cliente: { ...atual.cliente, [campo]: valor } }));
   const vincular = (produtoId, codigo) => setOpcoes((atual) => ({ ...atual, vinculos: { ...atual.vinculos, [produtoId]: codigo } }));
 
+  // Nota já autorizada na NFeMail (ex.: transmitida pela tela de lá).
+  const [baixandoDanfe, setBaixandoDanfe] = useState(false);
+  const baixarDanfeAutorizada = async () => {
+    setBaixandoDanfe(true);
+    try {
+      const { data } = await api.post(`/pedidos/${pedidoId}/nfe/danfe`, {}, { timeout: 120000 });
+      baixarPdf(data.danfe, `DANFE-${data.numero}.pdf`);
+      toast({ titulo: `DANFE da nota ${data.numero} baixada`, descricao: "Ela também ficou salva no pedido." });
+      onEmitida?.(data);
+    } catch (e) {
+      toast({ titulo: "Não foi possível baixar a DANFE", descricao: mensagemErro(e), tipo: "erro" });
+    } finally {
+      setBaixandoDanfe(false);
+    }
+  };
+
   const emitir = async () => {
     const ok = await confirmar({
       titulo: "Emitir a nota fiscal?",
@@ -162,6 +178,23 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
       )}
       {nota && !resultado?.emitida && (
         <div className="space-y-5 text-sm">
+          {nota.notasExistentes?.length > 0 && (
+            <div className="space-y-2 rounded-md border border-border bg-slate-50 p-3">
+              <p className="font-semibold">Notas deste pedido na NFeMail</p>
+              {nota.notasExistentes.map((n) => (
+                <div key={n.chave || n.numero} className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    Nota <b>{n.numero}</b> · {n.situacao}
+                  </span>
+                  {n.autorizada && (
+                    <Button size="sm" loading={baixandoDanfe} onClick={baixarDanfeAutorizada}>
+                      Baixar DANFE autorizada
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {nota.bloqueios.length > 0 && (
             <ul className="space-y-1 rounded-md bg-red-50 p-3 text-red-700">
               {nota.bloqueios.map((b) => (
