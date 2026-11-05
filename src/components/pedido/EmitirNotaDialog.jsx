@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api, { mensagemErro } from "../../services/api";
-import { Badge, Button, Dialog, Field, Input, Select, Spinner, Textarea, useConfirm, useToast } from "../ui";
-import { moeda } from "../../utils/format";
+import { Badge, Button, Checkbox, Dialog, Field, Input, Select, Spinner, Textarea, useConfirm, useToast } from "../ui";
+import { data as dataCurta, moeda } from "../../utils/format";
 
 const MOD_FRETE = { 0: "CIF (por conta do remetente)", 1: "FOB (por conta do destinatário)", 9: "Sem transporte (retirada)" };
 // Dados do cliente que a tela deixa completar quando faltam no pedido.
@@ -83,6 +83,16 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
   const alterar = (campo, valor) => setOpcoes((atual) => ({ ...atual, [campo]: valor }));
   const alterarCliente = (campo, valor) => setOpcoes((atual) => ({ ...atual, cliente: { ...atual.cliente, [campo]: valor } }));
   const vincular = (produtoId, codigo) => setOpcoes((atual) => ({ ...atual, vinculos: { ...atual.vinculos, [produtoId]: codigo } }));
+  // Juntar outros pedidos do cliente: volumes, peso e observações são recalculados.
+  const definirJuntos = (ids) =>
+    setOpcoes((atual) => {
+      const { qVol, pesoKg, infCpl, ...resto } = atual;
+      return { ...resto, juntar: ids };
+    });
+  const alternarJunto = (id, marcado) => {
+    const atuais = opcoes.juntar || [];
+    definirJuntos(marcado ? [...atuais, id] : atuais.filter((x) => x !== id));
+  };
 
   // Nota já autorizada na NFeMail (ex.: transmitida pela tela de lá).
   const [baixandoDanfe, setBaixandoDanfe] = useState(false);
@@ -169,6 +179,7 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
           {resultado.emitida ? (
             <>
               ✅ Nota <b>{resultado.numero}</b> autorizada. Chave {resultado.chave}.
+              {resultado.pedidosNaNota?.length > 1 && <span className="block">Pedidos nesta nota: {resultado.pedidosNaNota.join(", ")}.</span>}
               {resultado.erroDanfe && <span className="block">DANFE: {resultado.erroDanfe}</span>}
             </>
           ) : (
@@ -208,6 +219,44 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
                 <li key={a}>⚠️ {a}</li>
               ))}
             </ul>
+          )}
+
+          {nota.pedidosAbertos?.length > 0 && (
+            <section className="rounded-md border border-sky-300 bg-sky-50 p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-sky-900">
+                  {nota.juntos?.length
+                    ? `Juntando ${nota.juntos.length + 1} pedidos nesta nota`
+                    : `Este cliente tem ${nota.pedidosAbertos.length === 1 ? "outro pedido" : `${nota.pedidosAbertos.length} outros pedidos`} em aberto sem nota fiscal`}
+                </h3>
+                {nota.pedidosAbertos.length > (nota.juntos?.length || 0) ? (
+                  <Button size="sm" onClick={() => definirJuntos(nota.pedidosAbertos.map((p) => p.id))}>
+                    Juntar {nota.pedidosAbertos.length === 1 ? "na mesma nota" : "todos na mesma nota"}
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => definirJuntos([])}>
+                    Emitir só o pedido {nota.pedido.numeroFormatado}
+                  </Button>
+                )}
+              </div>
+              <p className="mb-2 text-sky-800">Sugestão: emitir uma nota só com os produtos de todos. A nota soma produtos, frete e descontos.</p>
+              <div className="space-y-2">
+                {nota.pedidosAbertos.map((p) => (
+                  <Checkbox
+                    key={p.id}
+                    checked={(opcoes.juntar || []).includes(p.id)}
+                    onChange={(marcado) => alternarJunto(p.id, marcado)}
+                    label={`Pedido ${p.numeroFormatado} · ${moeda(p.total)}`}
+                    descricao={`${dataCurta(p.criadoEm)} · ${p.statusVendas === "AGUARDANDO" ? "aguardando" : "liberado"} · ${p.metodoEnvio || "sem envio"}${p.observacoes ? ` · ${p.observacoes}` : ""}`}
+                  />
+                ))}
+              </div>
+              {nota.juntos?.length > 0 && (
+                <p className="mt-2 font-medium text-sky-900">
+                  Total dos pedidos: {moeda(nota.totalPedidos)} · Total da nota: {moeda(nota.totais.vNF)}
+                </p>
+              )}
+            </section>
           )}
 
           {completarCliente && (
