@@ -99,10 +99,11 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
 
   // Nota já autorizada na NFeMail (ex.: transmitida pela tela de lá).
   const [baixandoDanfe, setBaixandoDanfe] = useState(false);
-  const baixarDanfeAutorizada = async () => {
-    setBaixandoDanfe(true);
+  // pedidoNumero: quando a nota é de outro pedido (juntado ou que levou este junto).
+  const baixarDanfeAutorizada = async (pedidoNumero) => {
+    setBaixandoDanfe(pedidoNumero || true);
     try {
-      const { data } = await api.post(`/pedidos/${pedidoId}/nfe/danfe`, {}, { timeout: 120000 });
+      const { data } = await api.post(`/pedidos/${pedidoId}/nfe/danfe`, typeof pedidoNumero === "number" || typeof pedidoNumero === "string" ? { pedidoNumero } : {}, { timeout: 120000 });
       baixarPdf(data.danfe, `DANFE-${data.numero}.pdf`);
       toast({ titulo: `DANFE da nota ${data.numero} baixada`, descricao: "Ela também ficou salva no pedido." });
       onEmitida?.(data);
@@ -201,7 +202,7 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
                     Nota <b>{n.numero}</b> · {n.situacao}
                   </span>
                   {n.autorizada && (
-                    <Button size="sm" loading={baixandoDanfe} onClick={baixarDanfeAutorizada}>
+                    <Button size="sm" loading={Boolean(baixandoDanfe)} onClick={() => baixarDanfeAutorizada()}>
                       Baixar DANFE autorizada
                     </Button>
                   )}
@@ -210,10 +211,20 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
             </div>
           )}
           {nota.bloqueios.length > 0 && (
-            <ul className="space-y-1 rounded-md bg-red-50 p-3 text-red-700">
-              {nota.bloqueios.map((b) => (
-                <li key={b}>⛔ {b}</li>
-              ))}
+            <ul className="space-y-2 rounded-md bg-red-50 p-3 text-red-700">
+              {nota.bloqueios.map((b) => {
+                const comDanfe = nota.bloqueiosDanfe?.find((x) => x.mensagem === b);
+                return (
+                  <li key={b} className="flex flex-wrap items-center justify-between gap-2">
+                    <span>⛔ {b}</span>
+                    {comDanfe && (
+                      <Button size="sm" loading={baixandoDanfe === (comDanfe.pedidoNumero || true)} disabled={Boolean(baixandoDanfe)} onClick={() => baixarDanfeAutorizada(comDanfe.pedidoNumero)}>
+                        Baixar DANFE
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
           {nota.avisos.length > 0 && (
