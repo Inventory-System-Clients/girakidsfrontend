@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Link2, Maximize2, Package, PlayCircle, Search, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
+import { Link2, Maximize2, Package, PlayCircle, Search, Share2, ShoppingBag, Star, Minus, Plus, Settings2 } from "lucide-react";
 import api from "../services/api";
 import Carrossel from "../components/Carrossel";
 import BannerCarrossel, { useLayoutBanner } from "../components/BannerCarrossel";
@@ -223,7 +223,32 @@ export default function Catalogo() {
   const fecharDetalhe = () => {
     setDetalhe(null);
     setAmpliada(null);
-    if (window.location.pathname.startsWith("/produto/")) window.history.replaceState(window.history.state, "", "/");
+    if (window.location.pathname.startsWith("/produto/")) window.history.replaceState(window.history.state, "", caminhoCategoria(categoria));
+  };
+  // Cada categoria tem o próprio link (/?categoria=...): a barra de endereço
+  // acompanha a categoria escolhida e dá para compartilhar só ela.
+  const caminhoCategoria = (nome) => (nome ? `/?categoria=${encodeURIComponent(nome)}` : "/");
+  const escolherCategoria = (nome) => {
+    setCategoria(nome);
+    setPagina(1);
+    if (!window.location.pathname.startsWith("/produto/")) window.history.replaceState(window.history.state, "", caminhoCategoria(nome));
+  };
+  const compartilharCategoria = async () => {
+    const url = `${window.location.origin}${caminhoCategoria(categoria)}`;
+    if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
+      try {
+        await navigator.share({ title: `Gira Kids — ${categoria}`, text: `Veja os produtos de ${categoria} na Gira Kids:`, url });
+        return;
+      } catch (e) {
+        if (e?.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ titulo: "Link da categoria copiado", descricao: `Quem abrir o link verá só os produtos de ${categoria}.` });
+    } catch {
+      window.prompt("Copie o link da categoria:", url);
+    }
   };
   const linkProduto = (p) => `${window.location.origin}/produto/${p.id}`;
   const copiarLink = async (p) => {
@@ -238,12 +263,11 @@ export default function Catalogo() {
     if (b.produtoId) {
       api.get(`/catalogo/produtos/${b.produtoId}`).then(({ data }) => abrirDetalhe(data)).catch(() => {});
     } else if (b.categoria) {
-      setCategoria(b.categoria);
+      escolherCategoria(b.categoria);
       setBusca("");
-      setPagina(1);
     } else if (b.busca) {
       setBusca(b.busca);
-      setCategoria("");
+      escolherCategoria("");
     }
   };
 
@@ -309,10 +333,7 @@ export default function Catalogo() {
               {[{ nome: "", rotulo: "Todos", total: dados?.totalGeral }, ...(dados?.categorias || []).map((c) => ({ ...c, rotulo: c.nome }))].map((c) => (
                 <button
                   key={c.rotulo}
-                  onClick={() => {
-                    setCategoria(c.nome);
-                    setPagina(1);
-                  }}
+                  onClick={() => escolherCategoria(c.nome)}
                   className={cx(
                     "flex shrink-0 items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition",
                     categoria === c.nome ? "gradient-primary border-transparent text-white shadow" : "border-border bg-white hover:border-primary/40",
@@ -332,8 +353,16 @@ export default function Catalogo() {
             <input className="input h-11 bg-white pl-10 shadow-sm" placeholder="Buscar por nome, categoria, descrição..." value={busca} onChange={(e) => setBusca(e.target.value)} />
           </div>
           {layoutBanner === "CLASSICO" && !categoria && !buscaAplicada && <BannerCarrossel onAbrir={abrirBanner} />}
-          <Card className="mb-4 px-4 py-3 text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{dados?.total ?? "..."}</span> produtos encontrados
+          <Card className="mb-4 flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-muted-foreground">
+            <span>
+              <span className="font-semibold text-foreground">{dados?.total ?? "..."}</span> produtos encontrados
+              {categoria && <> em <span className="font-semibold text-foreground">{categoria}</span></>}
+            </span>
+            {categoria && (
+              <Button variant="outline" size="sm" onClick={compartilharCategoria}>
+                <Share2 className="h-4 w-4" /> Compartilhar esta categoria
+              </Button>
+            )}
           </Card>
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-6">
