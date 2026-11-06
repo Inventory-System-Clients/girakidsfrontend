@@ -60,6 +60,8 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
   const [resultado, setResultado] = useState(null);
   // Depois que faltou algo, os campos do cliente continuam abertos para editar.
   const [completarCliente, setCompletarCliente] = useState(false);
+  const [salvandoVinculo, setSalvandoVinculo] = useState(null);
+  const [recarregar, setRecarregar] = useState(0);
 
   const chaveOpcoes = JSON.stringify(opcoes);
   useEffect(() => {
@@ -81,11 +83,23 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
       ativo = false;
       clearTimeout(t);
     };
-  }, [pedidoId, chaveOpcoes]);
+  }, [pedidoId, chaveOpcoes, recarregar]);
 
   const alterar = (campo, valor) => setOpcoes((atual) => ({ ...atual, [campo]: valor }));
   const alterarCliente = (campo, valor) => setOpcoes((atual) => ({ ...atual, cliente: { ...atual.cliente, [campo]: valor } }));
-  const vincular = (produtoId, codigo) => setOpcoes((atual) => ({ ...atual, vinculos: { ...atual.vinculos, [produtoId]: codigo } }));
+  // Categoria da NF-e do item: salva no produto na hora e refaz a prévia.
+  const fixarVinculo = async (produtoId, codigo) => {
+    setSalvandoVinculo(produtoId);
+    try {
+      await api.put(`/nfe/produtos/${produtoId}/vinculo`, { codigo });
+      toast({ titulo: codigo ? "Categoria da NF-e fixada no produto" : "Produto voltou à categoria automática" });
+      setRecarregar((n) => n + 1);
+    } catch (e) {
+      toast({ titulo: "Não foi possível salvar", descricao: mensagemErro(e), tipo: "erro" });
+    } finally {
+      setSalvandoVinculo(null);
+    }
+  };
   // Juntar outros pedidos do cliente: volumes, peso e observações são recalculados.
   const definirJuntos = (ids) =>
     setOpcoes((atual) => {
@@ -326,14 +340,23 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
                 ? "Valores reais do pedido no site (com desconto e crédito usado)."
                 : "Valor baixo × quantidade (sem o desconto do site): o da NFeMail; se estiver vazio, o último que a NFeMail já teve (guardado) ou o padrão da categoria."}
             </p>
-            {nota.semVinculo.length > 0 && (
-              <div className="mb-3 space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3">
-                <p className="text-amber-900">Escolha o produto da NFeMail para cada item (fica salvo para as próximas notas):</p>
-                {nota.semVinculo.map((p) => (
-                  <div key={p.produtoId} className="grid gap-2 sm:grid-cols-2 sm:items-center">
-                    <span className="font-medium">{p.nome}</span>
-                    <Select value={opcoes.vinculos[p.produtoId] || ""} onChange={(e) => vincular(p.produtoId, e.target.value)}>
-                      <option value="">Selecione...</option>
+            <div className="mb-3 rounded-md border border-border p-3">
+              <p className="mb-1 font-medium">Categoria da NF-e de cada item</p>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Produto da NFeMail em que cada item entra na nota. Trocando aqui, fica fixado no produto para todas as próximas notas até trocar de novo.
+              </p>
+              <div className="space-y-2">
+                {(nota.vinculosItens || []).map((v) => (
+                  <div key={v.produtoId} className={`grid gap-2 sm:grid-cols-2 sm:items-center ${v.origem === "NENHUM" ? "rounded-md bg-amber-50 p-2" : ""}`}>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{v.nome}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {v.categoriaSite || "Sem categoria no site"} ·{" "}
+                        {v.origem === "FIXO" ? "fixado neste produto" : v.origem === "AUTOMATICO" ? "automático pela categoria do site" : "falta escolher"}
+                      </p>
+                    </div>
+                    <Select value={v.codigo} disabled={salvandoVinculo === v.produtoId} onChange={(e) => fixarVinculo(v.produtoId, e.target.value)}>
+                      <option value="">{v.origem === "FIXO" ? "Voltar ao automático (pela categoria do site)" : "Selecione..."}</option>
                       {nota.produtosNFeMail.map((n) => (
                         <option key={n.codigo} value={n.codigo}>
                           {n.nome} · NCM {n.ncm}
@@ -343,7 +366,7 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
                   </div>
                 ))}
               </div>
-            )}
+            </div>
             <table className="w-full">
               <thead className="text-xs uppercase text-muted-foreground">
                 <tr className="border-b border-border">
