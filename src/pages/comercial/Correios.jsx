@@ -80,6 +80,78 @@ const baixarArquivos = (arquivos) => {
   });
 };
 
+// Itens do pedido + caixas sugeridas pela Calculadora de Pedidos, acima dos
+// dados de envio (não precisa voltar ao Time de Vendas para ver o pedido).
+function ItensEVolumes({ pedido, onUsar }) {
+  const itens = pedido.itens || [];
+  const volumes = pedido.volumesSugeridos || [];
+  const totalVolumes = volumes.reduce((s, v) => s + v.volumes, 0);
+  const br = (n) => String(n).replace(".", ",");
+  return (
+    <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white p-4">
+        <h3 className="text-lg font-bold text-gray-900 mb-2">Itens do pedido ({itens.length})</h3>
+        {!itens.length ? (
+          <p className="text-sm text-gray-500">Pedido sem itens.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {itens.map((i) => (
+              <li key={i.id} className="flex items-center gap-3 py-2">
+                {i.imagemUrl ? (
+                  <img src={i.imagemUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
+                ) : (
+                  <div className="h-10 w-10 shrink-0 rounded bg-gray-100" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-gray-900">{i.nome}</p>
+                  <p className="text-xs text-gray-500">
+                    {[i.sku, i.categoria].filter(Boolean).join(" · ")}
+                    {i.unidadesPacote > 1 ? ` · pacote com ${i.unidadesPacote} un.` : ""}
+                  </p>
+                </div>
+                <p className="shrink-0 text-sm font-bold text-gray-900">
+                  {i.quantidade} {i.unidadesPacote > 1 ? (i.quantidade === 1 ? "pacote" : "pacotes") : "un."}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <h3 className="text-lg font-bold text-blue-900 mb-1">Caixas sugeridas</h3>
+        <p className="text-xs text-blue-800 mb-3">
+          Pela Calculadora de Pedidos: {totalVolumes} {totalVolumes === 1 ? "volume" : "volumes"}. Medidas em cm (A × L × C). Clique para preencher as
+          medidas da cotação.
+        </p>
+        {!volumes.length ? (
+          <p className="text-sm text-blue-900">Sem sugestão para este pedido.</p>
+        ) : (
+          <div className="space-y-2">
+            {volumes.map((v, n) => (
+              <button
+                key={n}
+                type="button"
+                className="w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-left text-sm hover:bg-blue-100"
+                onClick={() => onUsar(v)}
+              >
+                <span className="font-bold text-blue-900">
+                  {v.volumes}× {br(v.altura)} × {br(v.largura)} × {br(v.comprimento)} cm
+                </span>
+                {totalVolumes > 1 && v.pesoKg >= 0.1 ? <span className="text-blue-800"> · cerca de {br(v.pesoKg)} kg cada</span> : null}
+              </button>
+            ))}
+            {totalVolumes > 1 && (
+              <p className="text-xs text-blue-800">
+                Mais de um volume: cada caixa é uma postagem nos Correios. Cote e grave uma de cada vez com as medidas e o peso dela.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Correios() {
   const [nome, setNome] = useState("");
   const [inicio, setInicio] = useState(PERIODO_PADRAO.inicio);
@@ -240,6 +312,15 @@ export function Correios() {
   };
 
   const servicoEscolhido = servicos?.find((s) => s.id === servicoId);
+
+  // Preenche as medidas com uma caixa sugerida (o peso continua o do pedido).
+  const usarVolume = (v) => {
+    const br = (n) => String(n).replace(".", ",");
+    setAltura(br(v.altura));
+    setLargura(br(v.largura));
+    setComprimento(br(v.comprimento));
+    setServicos(null);
+  };
 
   return (
     <div className="min-h-screen bg-background-light bg-pattern teddy-pattern">
@@ -457,6 +538,8 @@ export function Correios() {
                 )}
               </div>
             )}
+
+            <ItensEVolumes pedido={pedido} onUsar={usarVolume} />
 
             <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">

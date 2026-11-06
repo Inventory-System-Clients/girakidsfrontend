@@ -46,6 +46,9 @@ const baixarTxt = (txt, nome) => {
 
 // Emissão automática da NF-e do pedido pela NFeMail: prévia com as regras da
 // Gira Kids (CFOP, ICMS, frete, pagamento), ajustes e emissão com DANFE.
+// De onde veio o valor baixo de cada linha da nota.
+const ORIGEM_VALOR = { NFEMAIL: "NFeMail", SALVO: "guardado da NFeMail", PADRAO: "padrão da categoria" };
+
 export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
   const toast = useToast();
   const confirmar = useConfirm();
@@ -304,13 +307,13 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold">Produtos da nota</h3>
               <Button size="sm" variant={opcoes.usarValorReal ? "primary" : "outline"} onClick={() => alterar("usarValorReal", !opcoes.usarValorReal)}>
-                {opcoes.usarValorReal ? "Voltar ao valor da NFeMail" : "Usar valor real"}
+                {opcoes.usarValorReal ? "Usar valor baixo (NFeMail)" : "Usar valor real (alto, do site)"}
               </Button>
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
               {opcoes.usarValorReal
                 ? "Valores reais do pedido no site (com desconto e crédito usado)."
-                : "Valores do cadastro de produtos da NFeMail × quantidade (sem o desconto do site)."}
+                : "Valor baixo × quantidade (sem o desconto do site): o da NFeMail; se estiver vazio, o último que a NFeMail já teve (guardado) ou o padrão da categoria."}
             </p>
             {nota.semVinculo.length > 0 && (
               <div className="mb-3 space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3">
@@ -353,7 +356,9 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
                     <td className="text-right">
                       {moeda(l.vProd)}
                       <span className="block text-xs text-muted-foreground">
-                        {l.origemValor === "NFEMAIL" ? `${moeda(l.vUnCom)}/${l.unidade} NFeMail · site ${moeda(l.valorSite)}` : "valor do site"}
+                        {l.origemValor === "SITE"
+                          ? `valor do site${l.valorBaixo ? ` · baixo ${moeda(l.valorBaixo)}/${l.unidade}` : ""}`
+                          : `${moeda(l.vUnCom)}/${l.unidade} ${ORIGEM_VALOR[l.origemValor] || "NFeMail"} · site ${moeda(l.valorSite)}`}
                       </span>
                     </td>
                   </tr>
