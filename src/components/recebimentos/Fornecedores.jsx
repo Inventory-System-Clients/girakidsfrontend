@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Pencil, Plus, Search, Truck } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, Truck } from "lucide-react";
 import api, { mensagemErro } from "../../services/api";
-import { Badge, Button, Dialog, EmptyState, Field, Input, Switch, Table, Td, Textarea, Th, useToast } from "../ui";
+import { Badge, Button, Dialog, EmptyState, Field, Input, Switch, Table, Td, Textarea, Th, useConfirm, useToast } from "../ui";
 import { BotaoWhatsapp } from "../Whatsapp";
 import { contemTexto, mascaraDocumento, mascaraTelefone } from "../../utils/format";
 
@@ -74,6 +74,28 @@ export function FornecedorForm({ fornecedor, onFechar, onSalvo }) {
 export default function Fornecedores({ fornecedores, onAtualizar }) {
   const [busca, setBusca] = useState("");
   const [form, setForm] = useState(undefined);
+  const [excluindo, setExcluindo] = useState(null);
+  const toast = useToast();
+  const confirmar = useConfirm();
+  const excluir = async (f) => {
+    const ok = await confirmar({
+      titulo: `Excluir ${f.nome}?`,
+      mensagem: "O fornecedor sai da lista. Os recebimentos e compras já feitos continuam no histórico com o nome dele.",
+      perigo: true,
+      confirmar: "Excluir fornecedor",
+    });
+    if (!ok) return;
+    setExcluindo(f.id);
+    try {
+      await api.delete(`/parceiros/${f.id}`);
+      toast({ titulo: "Fornecedor excluído" });
+      onAtualizar();
+    } catch (error) {
+      toast({ titulo: "Não foi possível excluir", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setExcluindo(null);
+    }
+  };
   const lista = fornecedores.filter((f) => !busca || contemTexto(`${f.nome} ${f.documento || ""} ${f.contato || ""}`, busca));
 
   return (
@@ -121,9 +143,14 @@ export default function Fornecedores({ fornecedores, onAtualizar }) {
                   <Badge variant={f.ativo ? "success" : "default"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
                 </Td>
                 <Td>
-                  <Button size="icon" variant="ghost" onClick={() => setForm(f)} aria-label="Editar">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
+                  <div className="flex justify-end gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => setForm(f)} aria-label="Editar">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="text-red-600 hover:bg-red-50" loading={excluindo === f.id} onClick={() => excluir(f)} aria-label="Excluir">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </Td>
               </tr>
             ))}
