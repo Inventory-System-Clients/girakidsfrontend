@@ -454,7 +454,8 @@ export default function Checkout({ modo = "pedido" }) {
             ? "Os dados ficaram salvos para os próximos pedidos (sem e-mail informado, o cliente não entra no site)."
             : !c.senhaPadrao
               ? "Os dados ficaram salvos para os próximos pedidos."
-              : `Login: ${c.email} · senha: ${c.senhaPadrao}. Da próxima vez os dados são preenchidos automaticamente.`,
+              : `Login: ${c.email} · senha provisória: ${c.senhaPadrao} (o cliente troca no primeiro acesso). Anote: ela não aparece de novo.`,
+          duracao: c.senhaPadrao ? 30000 : 4500,
         });
       };
       if (orcamento) {
@@ -551,7 +552,7 @@ export default function Checkout({ modo = "pedido" }) {
           <p className="text-4xl font-bold tracking-widest text-primary">{orcamentoGerado.numeroFormatado}</p>
           {orcamentoGerado.clienteCadastro?.criado && !orcamentoGerado.clienteCadastro.emailGerado && (
             <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
-              Cliente cadastrado — login <strong>{orcamentoGerado.clienteCadastro.email}</strong>, senha <strong>{orcamentoGerado.clienteCadastro.senhaPadrao}</strong>.
+              Cliente cadastrado — login <strong>{orcamentoGerado.clienteCadastro.email}</strong>, senha provisória <strong>{orcamentoGerado.clienteCadastro.senhaPadrao}</strong> (trocada no primeiro acesso; anote, ela não aparece de novo).
             </p>
           )}
           <div className="mt-6 flex flex-wrap justify-center gap-2">

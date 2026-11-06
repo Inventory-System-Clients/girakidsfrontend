@@ -297,10 +297,10 @@ const ToastContext = createContext(() => {});
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
-  const toast = useCallback(({ titulo, descricao, tipo = "sucesso" }) => {
+  const toast = useCallback(({ titulo, descricao, tipo = "sucesso", duracao = 4500 }) => {
     const id = Math.random().toString(36).slice(2);
     setToasts((t) => [...t, { id, titulo, descricao, tipo }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), duracao);
   }, []);
   return (
     <ToastContext.Provider value={toast}>

@@ -20,6 +20,7 @@ export default function Perfil() {
     try {
       const { data } = await api.put("/auth/perfil", dados);
       atualizarUsuario(data);
+      setDados(data);
       setEditando(false);
       toast({ titulo: "Dados atualizados" });
     } catch (error) {
@@ -47,7 +48,9 @@ export default function Perfil() {
   const trocarSenha = async () => {
     if (senhas.novaSenha !== senhas.confirmacao) return toast({ titulo: "As senhas não coincidem", tipo: "erro" });
     try {
-      await api.put("/auth/senha", senhas);
+      const { data } = await api.put("/auth/senha", senhas);
+      // Trocar a senha encerra as outras sessões; esta segue com o token novo.
+      if (data?.token) localStorage.setItem("token", data.token);
       atualizarUsuario({ ...usuario, trocarSenha: false });
       setSenhas({ senhaAtual: "", novaSenha: "", confirmacao: "" });
       toast({ titulo: "Senha alterada com sucesso" });
@@ -88,6 +91,11 @@ export default function Perfil() {
           )}
         </div>
         <EnderecoCampos valor={dados || {}} onChange={setDados} desabilitado={!editando} obrigatorio={usuario?.role === "CLIENTE"} />
+        {editando && String(dados?.email || "").trim().toLowerCase() !== String(usuario?.email || "").toLowerCase() && !usuario?.trocarSenha && (
+          <Field label="Senha atual (obrigatória para trocar o e-mail)" className="mt-3 max-w-xs">
+            <Input type="password" autoComplete="current-password" value={dados?.senhaAtual || ""} onChange={(e) => setDados((d) => ({ ...d, senhaAtual: e.target.value }))} />
+          </Field>
+        )}
         <p className="mt-2 text-xs text-muted-foreground">Endereço: dados usados para entregas e pedidos.</p>
       </Card>
       {usuario?.role === "CLIENTE" && (
