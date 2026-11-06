@@ -89,7 +89,10 @@ function ListaRecebimentos({ lista, onAbrir, onExcluir }) {
               {p.numero}
               {p.direto && <span className="block font-sans text-[11px] text-muted-foreground">direto</span>}
             </Td>
-            <Td className="text-left font-medium">{p.fornecedorNome || <span className="text-muted-foreground">—</span>}</Td>
+            <Td className="text-left font-medium">
+              {p.fornecedorNome || <span className="text-muted-foreground">—</span>}
+              {p.criadoPor && <span className="block text-[11px] font-normal text-muted-foreground">criado por {p.criadoPor}</span>}
+            </Td>
             <Td className="text-left">
               <div className="flex items-center gap-2">
                 <div className="flex -space-x-2">

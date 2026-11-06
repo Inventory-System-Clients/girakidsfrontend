@@ -187,6 +187,13 @@ export default function PreRecebimentoDetalhe({ id, linkInicial, fornecedores, o
               {pre.previsaoEntrega && <Linha rotulo="Previsão (nossa)">{data(pre.previsaoEntrega)}</Linha>}
               {pre.origemNumero && <Linha rotulo="Restante do recebimento">nº {pre.origemNumero}</Linha>}
               {pre.observacao && <Linha rotulo="Observação">{pre.observacao}</Linha>}
+              {pre.compraStatus && (
+                <Linha rotulo="Setor de compras">
+                  {pre.compraStatus === "PENDENTE"
+                    ? "A pagar (Financeiro → Setor de compras)"
+                    : `Pago em ${data(pre.compraPagoEm)} por ${pre.compradoPor} · ${moeda(Number(pre.compraValor))}`}
+                </Linha>
+              )}
               {pre.recebidoEm && (
                 <Linha rotulo="Recebido">
                   {dataHora(pre.recebidoEm)} por {pre.recebidoPor}

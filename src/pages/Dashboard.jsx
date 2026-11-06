@@ -31,6 +31,7 @@ import Analise from "../components/dashboard/Analise";
 import TabelaOrdenavel from "../components/dashboard/TabelaOrdenavel";
 import GraficoResumo from "../components/dashboard/GraficoResumo";
 import ProdutosAtivos from "../components/dashboard/ProdutosAtivos";
+import SetorCompras from "../components/dashboard/SetorCompras";
 import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaFinanceiro, CelulaMetodo, CelulaNumero, CelulaVendas } from "../components/pedido/StatusCelulas";
 import { dataHora, exportarCsv, hojeISO, inicioMesISO, lerNumero, moeda, numero, percentual } from "../utils/format";
 import { FINANCEIRO, FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
@@ -683,6 +684,7 @@ const ABAS = [
   { value: "meta", label: "Meta" },
   { value: "pedidos", label: "Pedidos expedidos" },
   { value: "estoque", label: "Estoque" },
+  { value: "compras", label: "🛒 Setor de compras" },
   { value: "analise", label: "📊 Análise" },
 ];
 
@@ -720,6 +722,7 @@ export default function Dashboard() {
       {aba === "meta" && <Meta periodo={periodo} />}
       {aba === "pedidos" && <PedidosExpedidos periodo={periodo} />}
       {aba === "estoque" && <Estoque periodo={periodo} />}
+      {aba === "compras" && <SetorCompras periodo={periodo} />}
       {aba === "analise" && <Analise periodo={periodo} />}
     </div>
   );
