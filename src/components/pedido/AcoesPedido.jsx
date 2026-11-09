@@ -29,6 +29,7 @@ import SeletorTransportadora from "../checkout/SeletorTransportadora";
 import { FotosUpload } from "./Fotos";
 import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
 import { EditorMescla, dadosReabertura, itensDoPedido, mesclaParaEnvio } from "../../pages/Checkout";
+import SelectBanco from "./SelectBanco";
 import { useCart } from "../../contexts/CartContext";
 import { data, hojeISO, lerNumero, moeda } from "../../utils/format";
 import { FORMAS_PAGAMENTO, METODOS_ENVIO, nomeForma } from "../../utils/status";
@@ -52,6 +53,7 @@ function LiberarDialog({ pedido, modo, onFechar, onFeito }) {
   const [observacao, setObservacao] = useState("");
   const [metodo, setMetodo] = useState(pedido.formaPagamento === "A_DEFINIR" ? "" : pedido.formaPagamento);
   const [dataRec, setDataRec] = useState(hojeISO());
+  const [banco, setBanco] = useState("");
   const [enviando, setEnviando] = useState(false);
   const toast = useToast();
   const liberar = modo === "liberar";
@@ -62,7 +64,7 @@ function LiberarDialog({ pedido, modo, onFechar, onFeito }) {
     try {
       const { data: d } = liberar
         ? await api.post(`/pedidos/${pedido.id}/liberar`, { observacao })
-        : await api.post(`/pedidos/${pedido.id}/confirmar-pagamento`, { observacao, metodo: metodo || undefined, data: dataRec });
+        : await api.post(`/pedidos/${pedido.id}/confirmar-pagamento`, { observacao, metodo: metodo || undefined, data: dataRec, banco: banco || undefined });
       toast({ titulo: liberar ? "Pedido liberado para expedição" : quitar ? "Pendência quitada" : "Pagamento confirmado" });
       onFeito(d);
     } catch (error) {
@@ -135,6 +137,9 @@ function LiberarDialog({ pedido, modo, onFechar, onFeito }) {
             <Field label="Data do recebimento">
               <Input type="date" value={dataRec} onChange={(e) => setDataRec(e.target.value)} />
             </Field>
+            <Field label="Banco que recebeu" className="sm:col-span-2" dica="Use o + para cadastrar outro banco">
+              <SelectBanco value={banco} onChange={setBanco} />
+            </Field>
           </div>
         )}
         <Field label={`${liberar ? "Observação da liberação" : "Observação da quitação"} (opcional)`} dica="Pode deixar em branco">
@@ -150,6 +155,7 @@ function RecebimentoDialog({ pedido, onFechar, onFeito }) {
   const [metodo, setMetodo] = useState("");
   const [dataRec, setDataRec] = useState(hojeISO());
   const [observacao, setObservacao] = useState("");
+  const [banco, setBanco] = useState("");
   const [enviando, setEnviando] = useState(false);
   const toast = useToast();
   const saldo = pedido.total - pedido.totalRecebido;
@@ -158,7 +164,7 @@ function RecebimentoDialog({ pedido, onFechar, onFeito }) {
   const enviar = async () => {
     setEnviando(true);
     try {
-      const { data: d } = await api.post(`/pedidos/${pedido.id}/recebimentos`, { valor: lerNumero(valor), metodo, data: dataRec, observacao });
+      const { data: d } = await api.post(`/pedidos/${pedido.id}/recebimentos`, { valor: lerNumero(valor), metodo, data: dataRec, observacao, banco: banco || undefined });
       toast({ titulo: "Recebimento registrado" });
       onFeito(d);
     } catch (error) {
@@ -205,6 +211,9 @@ function RecebimentoDialog({ pedido, onFechar, onFeito }) {
             <Input type="date" value={dataRec} onChange={(e) => setDataRec(e.target.value)} />
           </Field>
         </div>
+        <Field label="Banco que recebeu" dica="Use o + para cadastrar outro banco">
+          <SelectBanco value={banco} onChange={setBanco} />
+        </Field>
         <Field label="Observação (opcional)">
           <Textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Ex.: pagamento referente à primeira parcela" />
         </Field>
@@ -257,6 +266,7 @@ function ParcelasDialog({ pedido: inicial, onFechar, onFeito }) {
               <span>{moeda(p.valor)}</span>
               <span className="text-muted-foreground">
                 {nomeForma(p.metodoRecebido || p.metodoPrevisto)} · venc. {data(p.vencimento)}
+                {p.bancoRecebedor && ` · ${p.bancoRecebedor}`}
               </span>
               <Badge variant={p.status === "RECEBIDA" ? "success" : p.status === "CANCELADA" ? "default" : "warning"}>
                 {p.status === "RECEBIDA" ? `Recebida em ${data(p.recebidaEm)}` : p.status === "CANCELADA" ? "Cancelada" : "Em aberto"}
@@ -276,12 +286,15 @@ function ParcelasDialog({ pedido: inicial, onFechar, onFeito }) {
           {!pedido.parcelas.length && <p className="text-sm text-muted-foreground">Nenhuma parcela cadastrada.</p>}
         </div>
         {confirmando && (
-          <div className="grid gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 sm:grid-cols-[1fr_10rem_auto]">
+          <div className="grid gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 sm:grid-cols-[1fr_10rem_1fr_auto]">
             <Field label={`Método recebido (parcela ${confirmando.parcela.numero})`}>
               <SelectForma value={confirmando.metodo} onChange={(m) => setConfirmando({ ...confirmando, metodo: m })} />
             </Field>
             <Field label="Data do recebimento">
               <Input type="date" value={confirmando.data} onChange={(e) => setConfirmando({ ...confirmando, data: e.target.value })} />
+            </Field>
+            <Field label="Banco que recebeu">
+              <SelectBanco value={confirmando.banco} onChange={(b) => setConfirmando({ ...confirmando, banco: b })} />
             </Field>
             <div className="flex items-end gap-2">
               <Button variant="outline" onClick={() => setConfirmando(null)}>
@@ -291,7 +304,7 @@ function ParcelasDialog({ pedido: inicial, onFechar, onFeito }) {
                 variant="success"
                 onClick={async () => {
                   const ok = await executar(
-                    () => api.put(`/pedidos/${pedido.id}/parcelas/${confirmando.parcela.id}`, { acao: "CONFIRMAR", metodoRecebido: confirmando.metodo, recebidaEm: confirmando.data }),
+                    () => api.put(`/pedidos/${pedido.id}/parcelas/${confirmando.parcela.id}`, { acao: "CONFIRMAR", metodoRecebido: confirmando.metodo, recebidaEm: confirmando.data, banco: confirmando.banco || undefined }),
                     "Parcela confirmada",
                   );
                   if (ok) setConfirmando(null);

@@ -32,6 +32,7 @@ import TabelaOrdenavel from "../components/dashboard/TabelaOrdenavel";
 import GraficoResumo from "../components/dashboard/GraficoResumo";
 import ProdutosAtivos from "../components/dashboard/ProdutosAtivos";
 import SetorCompras from "../components/dashboard/SetorCompras";
+import Boletos from "../components/dashboard/Boletos";
 import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaFinanceiro, CelulaMetodo, CelulaNumero, CelulaVendas } from "../components/pedido/StatusCelulas";
 import { dataHora, exportarCsv, hojeISO, inicioMesISO, lerNumero, moeda, numero, percentual } from "../utils/format";
 import { FINANCEIRO, FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
@@ -78,6 +79,29 @@ const moedaCurta = (v) => (Math.abs(v) >= 1000 ? `R$ ${numero(v / 1000, 1)} mil`
 
 // ---------------------------------------------------------------------------
 
+// Barras horizontais com valor e % de cada linha (formas, bancos...). Uma
+// série só, em azul; o texto fica na cor do texto.
+function BarrasPercentuais({ linhas, nome, vazio = "Nada registrado no período." }) {
+  if (!linhas?.length) return <p className="py-3 text-sm text-muted-foreground">{vazio}</p>;
+  const maior = Math.max(...linhas.map((l) => l.valor), 0) || 1;
+  return (
+    <div className="space-y-2">
+      {linhas.map((l) => (
+        <div key={nome(l)} className="grid grid-cols-[minmax(7rem,12rem)_1fr_auto] items-center gap-3 text-sm" title={`${nome(l)}: ${moeda(l.valor)} (${percentual(l.percentual)}) · ${l.pedidos} ${l.pedidos === 1 ? "pedido" : "pedidos"}`}>
+          <span className="truncate">{nome(l)}</span>
+          <div className="h-3 rounded-r bg-slate-100">
+            <div className="h-3 rounded-r" style={{ width: `${Math.max(1, (l.valor / maior) * 100)}%`, background: AZUL }} />
+          </div>
+          <span className="whitespace-nowrap text-right">
+            <b>{percentual(l.percentual)}</b> <span className="text-muted-foreground">· {moeda(l.valor)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+const nomeBanco = (l) => l.banco || "Não informado";
+
 // Recebimentos: pedidos marcados como pago no período (data do pagamento).
 // Visão de caixa, separada da receita (que é pela data do pedido).
 function Recebimentos({ pagos }) {
@@ -109,14 +133,20 @@ function Recebimentos({ pagos }) {
           </div>
         </Card>
       )}
+      <Card className="mt-3 p-4">
+        <p className="text-sm font-semibold">Recebido por banco</p>
+        <p className="mb-3 text-xs text-muted-foreground">Para qual banco foi cada pagamento dos pedidos marcados como pago no período.</p>
+        <BarrasPercentuais linhas={pagos.porBanco} nome={nomeBanco} />
+      </Card>
     </section>
   );
 }
 
-function Resumo({ periodo }) {
+function Resumo({ periodo, onAbrirBoletos }) {
   const [d, setD] = useState(null);
   const [modo, setModo] = useState("bruta");
   const [expandido, setExpandido] = useState(false);
+  const [verFormas, setVerFormas] = useState(false);
   useEffect(() => {
     setD(null);
     api.get("/dashboard/resumo", { params: periodo }).then(({ data }) => setD(data));
@@ -131,12 +161,36 @@ function Resumo({ periodo }) {
         <p className="text-xs text-muted-foreground">Receita = pedidos criados no período, menos cancelados (mesmo valor do "Realizado" da Meta). Pedido tirado em outro período conta lá, mesmo que seja expedido agora. Receita líquida desconta taxas, frete, custo dos itens e custos pós-venda; sem custo cadastrado, considera R$ 0,00.</p>
         <Segmented value={modo} onChange={setModo} opcoes={[{ value: "bruta", label: "Receita bruta" }, { value: "liquida", label: "Receita líquida" }]} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard titulo={nome} valor={moeda(d.cards.total[r])} detalhe={`${d.cards.total.pedidos} pedidos criados no período`} />
-        <MetricCard titulo={`${nome} recebida`} valor={moeda(d.cards.recebida[r])} detalhe={`${d.cards.recebida.pedidos} pedidos do período já pagos`} />
-        <MetricCard titulo={`${nome} em aberto`} valor={moeda(d.cards.aberto[r])} detalhe={`${d.cards.aberto.pedidos} pedidos do período com pagamento em aberto`} />
+        <button type="button" className="text-left" onClick={() => setVerFormas(!verFormas)} aria-expanded={verFormas}>
+          <MetricCard
+            className={cx("h-full transition hover:border-primary/50", verFormas && "border-primary! ring-2 ring-primary/20")}
+            titulo={`${nome} recebida`}
+            valor={moeda(d.cards.recebida[r])}
+            detalhe={`${d.cards.recebida.pedidos} pedidos do período já pagos · ${verFormas ? "esconder" : "ver"} formas de pagamento`}
+          />
+        </button>
+        <MetricCard titulo={`${nome} em aberto`} valor={moeda(d.cards.aberto[r])} detalhe={`${d.cards.aberto.pedidos} pedidos do período com pagamento em aberto (fora boletos)`} />
+        <button type="button" className="text-left" onClick={onAbrirBoletos}>
+          <MetricCard
+            className="h-full border-red-200! bg-red-50! transition hover:border-red-400!"
+            titulo="Boletos"
+            valor={moeda(d.cards.boletos[r])}
+            detalhe={`${d.cards.boletos.pedidos} pedidos do período com boleto aguardando pagamento · ver boletos`}
+          />
+        </button>
         <MetricCard titulo={`${nome} aguardando liberação`} valor={moeda(d.cards.aguardando[r])} detalhe={`${d.cards.aguardando.pedidos} pedidos do período ainda não liberados pelo Time de Vendas`} />
       </div>
+      {verFormas && (
+        <Card className="p-4">
+          <p className="text-sm font-semibold">Receita bruta recebida por forma de pagamento</p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Pedidos criados no período e já pagos ({moeda(d.cards.recebida.bruta)}), pelo que entrou em cada forma; mescla aparece separada em cada forma usada.
+          </p>
+          <BarrasPercentuais linhas={d.recebidaPorForma} nome={(l) => nomeForma(l.forma)} />
+        </Card>
+      )}
       <div className="flex justify-center">
         <button onClick={() => setExpandido(!expandido)} className="rounded-full border border-border bg-white p-1.5 shadow-sm" aria-label="Mais indicadores">
           {expandido ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -154,6 +208,12 @@ function Resumo({ periodo }) {
       )}
 
       <GraficoResumo d={d} />
+
+      <Card className="p-4">
+        <p className="font-semibold">Pagamentos por banco · pedidos do período</p>
+        <p className="mb-3 text-xs text-muted-foreground">Para qual banco foi cada pagamento já registrado dos pedidos criados no período (em % do valor recebido).</p>
+        <BarrasPercentuais linhas={d.graficos.bancos} nome={nomeBanco} />
+      </Card>
 
       <Recebimentos pagos={d.pagos} />
 
@@ -684,6 +744,7 @@ const ABAS = [
   { value: "meta", label: "Meta" },
   { value: "pedidos", label: "Pedidos expedidos" },
   { value: "estoque", label: "Estoque" },
+  { value: "boletos", label: "Boletos" },
   { value: "compras", label: "🛒 Setor de compras" },
   { value: "analise", label: "📊 Análise" },
 ];
@@ -716,9 +777,10 @@ export default function Dashboard() {
       </PageHeader>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs abas={ABAS} ativa={aba} onChange={(v) => setParams({ view: v })} />
-        <PeriodoPicker inicio={periodo.inicio} fim={periodo.fim} onChange={setPeriodo} />
+        {aba !== "boletos" && <PeriodoPicker inicio={periodo.inicio} fim={periodo.fim} onChange={setPeriodo} />}
       </div>
-      {aba === "resumo" && <Resumo periodo={periodo} />}
+      {aba === "resumo" && <Resumo periodo={periodo} onAbrirBoletos={() => setParams({ view: "boletos" })} />}
+      {aba === "boletos" && <Boletos />}
       {aba === "meta" && <Meta periodo={periodo} />}
       {aba === "pedidos" && <PedidosExpedidos periodo={periodo} />}
       {aba === "estoque" && <Estoque periodo={periodo} />}
