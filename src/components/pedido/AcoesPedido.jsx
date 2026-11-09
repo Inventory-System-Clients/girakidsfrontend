@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  CalendarDays,
   Ban,
   CheckCircle2,
   ClipboardCheck,
@@ -28,7 +29,7 @@ import EmitirNotaDialog from "./EmitirNotaDialog";
 import SeletorTransportadora from "../checkout/SeletorTransportadora";
 import { FotosUpload } from "./Fotos";
 import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
-import { EditorMescla, dadosReabertura, itensDoPedido, mesclaParaEnvio } from "../../pages/Checkout";
+import { EditorBoletos, EditorMescla, boletoPadrao, dadosReabertura, itensDoPedido, mesclaParaEnvio } from "../../pages/Checkout";
 import SelectBanco from "./SelectBanco";
 import { useCart } from "../../contexts/CartContext";
 import { data, hojeISO, lerNumero, moeda } from "../../utils/format";
@@ -350,6 +351,77 @@ function ParcelasDialog({ pedido: inicial, onFechar, onFeito }) {
   );
 }
 
+// Boletos de um pedido em boleto: data do primeiro e quantidade (30 em 30
+// dias). Troca os boletos ainda não pagos; os pagos ficam.
+function BoletosDialog({ pedido, onFechar, onFeito }) {
+  const [config, setConfig] = useState(() => pedido.boletoConfig || boletoPadrao());
+  const [enviando, setEnviando] = useState(false);
+  const toast = useToast();
+  const pagos = pedido.parcelas.filter((p) => p.status === "RECEBIDA");
+  const outrasAbertas = pedido.formaPagamento === "BOLETO" ? [] : pedido.parcelas.filter((p) => p.status === "ABERTA" && p.metodoPrevisto !== "BOLETO");
+  const restante = Math.max(0, Math.round((pedido.total - pagos.reduce((s, p) => s + p.valor, 0) - outrasAbertas.reduce((s, p) => s + p.valor, 0)) * 100) / 100);
+  const abertos = pedido.parcelas.filter((p) => p.status === "ABERTA" && (p.metodoPrevisto === "BOLETO" || pedido.formaPagamento === "BOLETO"));
+
+  const salvar = async () => {
+    setEnviando(true);
+    try {
+      const { data: d } = await api.put(`/pedidos/${pedido.id}/boletos`, config);
+      toast({ titulo: "Boletos gerados", descricao: `${config.quantidade} ${config.quantidade === 1 ? "boleto" : "boletos"} de 30 em 30 dias` });
+      onFeito(d);
+    } catch (error) {
+      toast({ titulo: "Não foi possível gerar os boletos", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <Dialog
+      aberto
+      onFechar={onFechar}
+      tamanho="lg"
+      titulo={`Boletos · Pedido ${pedido.numeroFormatado}`}
+      descricao="Escolha o vencimento do primeiro boleto e a quantidade; os seguintes vencem de 30 em 30 dias."
+      rodape={
+        <>
+          <Button variant="outline" onClick={onFechar}>
+            Cancelar
+          </Button>
+          <Button loading={enviando} disabled={restante <= 0} onClick={salvar}>
+            {abertos.length ? "Refazer boletos" : "Gerar boletos"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-3 gap-3 text-sm">
+          {[
+            ["Total do pedido", pedido.total],
+            ["Já recebido", pedido.totalRecebido],
+            ["Dividir em boletos", restante],
+          ].map(([r, v]) => (
+            <div key={r} className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs text-muted-foreground">{r}</p>
+              <p className="font-semibold">{moeda(v)}</p>
+            </div>
+          ))}
+        </div>
+        {abertos.length > 0 && (
+          <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="font-medium">Boletos em aberto hoje (serão substituídos):</p>
+            {abertos.map((p) => (
+              <p key={p.id}>
+                Parcela {p.numero}: {moeda(p.valor)} · vence {data(p.vencimento)}
+              </p>
+            ))}
+          </div>
+        )}
+        <EditorBoletos config={config} onChange={setConfig} valor={restante} />
+      </div>
+    </Dialog>
+  );
+}
+
 function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
   const [forma, setForma] = useState(pedido.formaPagamento);
   const [parcelas, setParcelas] = useState(pedido.parcelasCartao || 1);
@@ -359,6 +431,7 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [salvo, setSalvo] = useState(null);
+  const [boleto, setBoleto] = useState(() => pedido.boletoConfig || boletoPadrao());
   // Taxas do cartão (para a parte no cartão da mescla).
   const [opcoesCheckout, setOpcoesCheckout] = useState(null);
   useEffect(() => {
@@ -376,6 +449,7 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
         formaPagamento: forma,
         parcelasCartao: cartao ? parcelas : null,
         composicaoPagamento: forma === "MESCLA" ? mesclaParaEnvio(mescla, opcoesCheckout) : null,
+        boleto: forma === "BOLETO" ? boleto : null,
         motivo,
       });
       toast({ titulo: "Forma de pagamento alterada", descricao: `Novo total: ${moeda(d.total)}` });
@@ -430,6 +504,12 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
             </Field>
           )}
         </div>
+        {forma === "BOLETO" && pedido.statusFinanceiro !== "PAGO" && (
+          <>
+            <p className="text-sm text-muted-foreground">Boletos do que falta receber ({moeda(base - (pedido.totalRecebido || 0))}). Os boletos em aberto do pedido são trocados por estes.</p>
+            <EditorBoletos config={boleto} onChange={setBoleto} valor={Math.max(0, base - (pedido.totalRecebido || 0))} />
+          </>
+        )}
         {forma === "MESCLA" && (
           <>
             <p className="text-sm text-muted-foreground">
@@ -1111,6 +1191,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
             },
             contexto === "vendas" && ativo && pedido.statusFinanceiro === "AGUARDANDO_PAGAMENTO" && financeiro && { label: "Registrar recebimento", icone: HandCoins, onClick: () => comCompleto("recebimento") },
             contexto === "vendas" && ativo && financeiro && { label: "Controle de parcelas", icone: ListChecks, onClick: () => comCompleto("parcelas") },
+            contexto === "vendas" && ativo && financeiro && pedido.formaPagamento === "BOLETO" && pedido.statusFinanceiro !== "PAGO" && { label: "Boletos (vencimentos)", icone: CalendarDays, onClick: () => comCompleto("boletos") },
             contexto === "vendas" && ativo && financeiro && { label: "Alterar forma de pagamento", icone: CreditCard, onClick: () => comCompleto("forma") },
             contexto === "vendas" && ativo && pedido.statusFinanceiro !== "PAGO" && statusPag?.maquininha?.habilitado && pode("VENDAS", "FINANCEIRO", "CHECKOUT") && {
               label: "Cobrar na maquininha",
@@ -1136,6 +1217,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
       {dialogo?.nome === "recebimento" && <RecebimentoDialog {...props} />}
       {dialogo?.nome === "parcelas" && <ParcelasDialog {...props} />}
       {dialogo?.nome === "forma" && <FormaPagamentoDialog {...props} />}
+      {dialogo?.nome === "boletos" && <BoletosDialog {...props} />}
       {dialogo?.nome === "transportadora" && <TransportadoraDialog {...props} />}
       {dialogo?.nome === "nota" && <NotaFiscalDialog {...props} />}
       {dialogo?.nome === "expedir" && <ExpedirDialog {...props} />}

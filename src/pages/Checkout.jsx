@@ -109,6 +109,7 @@ export const dadosReabertura = (p) => {
     formaPagamento: p.formaPagamento || "",
     parcelasCartao: p.parcelasCartao || 1,
     composicaoPagamento: (p.composicaoPagamento || []).map((l) => ({ ...l, valor: valorCampo(l.valor) })),
+    boletoConfig: p.boletoConfig || null,
     usarCredito: Number(p.creditoUsado) > 0,
     desconto: valorCampo(p.desconto),
     freteAdicional: valorCampo(p.freteAdicional),
@@ -217,6 +218,58 @@ function CarregarPedido({ onCarregado }) {
         </div>
       )}
     </Popover>
+  );
+}
+
+// Boletos: data do primeiro e quantidade; os seguintes vencem de 30 em 30
+// dias contando do primeiro. Divide o valor em partes iguais (o último acerta
+// os centavos), igual ao servidor.
+const somarDias = (iso, dias) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+export const boletoPadrao = () => ({ primeiroVencimento: somarDias(hojeISO(), 30), quantidade: 1 });
+export const montarBoletos = (valor, config) => {
+  const qtd = Math.max(1, Number(config?.quantidade) || 1);
+  if (!config?.primeiroVencimento) return [];
+  const base = Math.floor((valor / qtd) * 100) / 100;
+  return Array.from({ length: qtd }, (_, i) => ({
+    valor: i === qtd - 1 ? Math.round((valor - base * (qtd - 1)) * 100) / 100 : base,
+    vencimento: somarDias(config.primeiroVencimento, 30 * i),
+  }));
+};
+export function EditorBoletos({ config, onChange, valor }) {
+  const boletos = montarBoletos(valor, config);
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-slate-50 p-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Vencimento do 1º boleto">
+          <Input type="date" value={config.primeiroVencimento} onChange={(e) => onChange({ ...config, primeiroVencimento: e.target.value })} />
+        </Field>
+        <Field label="Quantidade de boletos" dica="De 30 em 30 dias a partir do primeiro">
+          <Select value={config.quantidade} onChange={(e) => onChange({ ...config, quantidade: Number(e.target.value) })}>
+            {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>
+                {n} {n === 1 ? "boleto" : "boletos"}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      {boletos.length > 0 && valor > 0 && (
+        <div className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+          {boletos.map((b, i) => (
+            <div key={i} className="flex justify-between border-b border-border py-1">
+              <span className="text-muted-foreground">
+                {i + 1}º · vence {new Date(`${b.vencimento}T12:00:00`).toLocaleDateString("pt-BR")}
+              </span>
+              <span className="font-medium">{moeda(b.valor)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -372,6 +425,7 @@ export default function Checkout({ modo = "pedido" }) {
   const [forma, setForma] = useState(reab?.formaPagamento || (interno ? "A_DEFINIR" : escolhasGiraldo.formaPagamento || ""));
   const [parcelas, setParcelas] = useState(reab?.parcelasCartao || 1);
   const [mescla, setMescla] = useState(reab?.composicaoPagamento || []);
+  const [boleto, setBoleto] = useState(() => reab?.boletoConfig || boletoPadrao());
   const [usarCredito, setUsarCredito] = useState(Boolean(reab?.usarCredito));
   const [enviando, setEnviando] = useState(false);
   // Banco/maquininha recusou a cobrança: o pedido não foi salvo e a tela
@@ -476,6 +530,7 @@ export default function Checkout({ modo = "pedido" }) {
         formaPagamento: forma || "A_DEFINIR",
         parcelasCartao: config?.cartao ? parcelas : null,
         composicaoPagamento: forma === "MESCLA" ? mesclaParaEnvio(mescla, opcoes) : null,
+        boleto: forma === "BOLETO" ? boleto : null,
         usarCredito,
         transportadora:
           metodoEnvio === "TRANSPORTADORA" && transportadora
@@ -1062,6 +1117,11 @@ export default function Checkout({ modo = "pedido" }) {
                   ))}
                 </Select>
               </Field>
+            )}
+            {forma === "BOLETO" && (
+              <div className="mt-4">
+                <EditorBoletos config={boleto} onChange={setBoleto} valor={total} />
+              </div>
             )}
             {forma === "MESCLA" && (
               <div className="mt-4">
