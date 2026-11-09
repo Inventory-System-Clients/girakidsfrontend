@@ -47,7 +47,58 @@ const baixarTxt = (txt, nome) => {
 // Emissão automática da NF-e do pedido pela NFeMail: prévia com as regras da
 // Gira Kids (CFOP, ICMS, frete, pagamento), ajustes e emissão com DANFE.
 // De onde veio o valor baixo de cada linha da nota.
-const ORIGEM_VALOR = { NFEMAIL: "NFeMail", SALVO: "guardado da NFeMail", PADRAO: "padrão da categoria" };
+const ORIGEM_VALOR = { NFEMAIL: "NFeMail", SALVO: "guardado da NFeMail", PADRAO: "padrão da categoria", MANUAL: "digitado (fixo)" };
+
+// Valor unitário mostrado com até 4 casas (ex.: 0,08 · 0,0525).
+const valorUnitario = (v) => Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
+// Clica no valor unitário da linha e digita: fica fixo para esse produto da
+// NFeMail em todas as notas até trocar ou voltar ao automático.
+function ValorUnitarioEditavel({ linha, salvando, onSalvar }) {
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState("");
+  const abrir = () => {
+    setTexto(valorUnitario(linha.vUnCom).replace(/\./g, ""));
+    setEditando(true);
+  };
+  const confirmar = () => {
+    setEditando(false);
+    const novo = texto.trim();
+    if (!novo || novo === valorUnitario(linha.vUnCom).replace(/\./g, "")) return;
+    onSalvar(novo);
+  };
+  if (editando) {
+    return (
+      <span className="mt-1 flex items-center justify-end gap-1">
+        <span className="text-xs text-muted-foreground">R$</span>
+        <input
+          autoFocus
+          className="input h-7 w-24 px-2 text-right text-sm"
+          inputMode="decimal"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value.replace(/[^\d,.]/g, ""))}
+          onBlur={confirmar}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") setEditando(false);
+          }}
+        />
+        <span className="text-xs text-muted-foreground">/{linha.unidade}</span>
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={salvando}
+      onClick={abrir}
+      title="Clique para digitar o valor unitário desta linha"
+      className="rounded px-1 font-medium text-primary underline decoration-dotted underline-offset-2 hover:bg-primary/10 disabled:opacity-50"
+    >
+      R$ {valorUnitario(linha.vUnCom)}/{linha.unidade}
+    </button>
+  );
+}
 
 export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
   const toast = useToast();
@@ -62,6 +113,7 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
   const [completarCliente, setCompletarCliente] = useState(false);
   const [salvandoVinculo, setSalvandoVinculo] = useState(null);
   const [recarregar, setRecarregar] = useState(0);
+  const [salvandoValor, setSalvandoValor] = useState(null);
 
   const chaveOpcoes = JSON.stringify(opcoes);
   useEffect(() => {
@@ -98,6 +150,19 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
       toast({ titulo: "Não foi possível salvar", descricao: mensagemErro(e), tipo: "erro" });
     } finally {
       setSalvandoVinculo(null);
+    }
+  };
+  // Valor unitário digitado: salva para o produto da NFeMail e refaz a prévia.
+  const fixarValor = async (codigo, valor) => {
+    setSalvandoValor(codigo);
+    try {
+      await api.put(`/nfe/valores/${codigo}`, { valor });
+      toast({ titulo: valor ? "Valor fixado para este produto da NF-e" : "Valor voltou ao automático" });
+      setRecarregar((n) => n + 1);
+    } catch (e) {
+      toast({ titulo: "Não foi possível salvar o valor", descricao: mensagemErro(e), tipo: "erro" });
+    } finally {
+      setSalvandoValor(null);
     }
   };
   // Juntar outros pedidos do cliente: volumes, peso e observações são recalculados.
@@ -338,7 +403,8 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
             <p className="mb-2 text-xs text-muted-foreground">
               {opcoes.usarValorReal
                 ? "Valores reais do pedido no site (com desconto e crédito usado)."
-                : "Valor baixo × quantidade (sem o desconto do site): o da NFeMail; se estiver vazio, o último que a NFeMail já teve (guardado) ou o padrão da categoria."}
+                : "Valor baixo × quantidade (sem o desconto do site): o da NFeMail; se estiver vazio, o último que a NFeMail já teve (guardado) ou o padrão da categoria."}{" "}
+              Clique no valor unitário de uma linha para digitar outro: ele fica fixo para esse produto em todas as notas até trocar.
             </p>
             <div className="mb-3 rounded-md border border-border p-3">
               <p className="mb-1 font-medium">Categoria da NF-e de cada item</p>
@@ -387,13 +453,21 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
                     <td className="text-right">
                       {l.qCom} {l.unidade}
                     </td>
-                    <td className="text-right">
-                      {moeda(l.vProd)}
-                      <span className="block text-xs text-muted-foreground">
+                    <td className="text-right align-top">
+                      <span className="font-medium">{moeda(l.vProd)}</span>
+                      <span className="block">
+                        <ValorUnitarioEditavel linha={l} salvando={salvandoValor === l.codigoNFe} onSalvar={(v) => fixarValor(l.codigoNFe, v)} />
+                      </span>
+                      <span className={`block text-xs ${l.origemValor === "MANUAL" ? "text-amber-700" : "text-muted-foreground"}`}>
                         {l.origemValor === "SITE"
                           ? `valor do site${l.valorBaixo ? ` · baixo ${moeda(l.valorBaixo)}/${l.unidade}` : ""}`
-                          : `${moeda(l.vUnCom)}/${l.unidade} ${ORIGEM_VALOR[l.origemValor] || "NFeMail"} · site ${moeda(l.valorSite)}`}
+                          : `${ORIGEM_VALOR[l.origemValor] || "NFeMail"} · site ${moeda(l.valorSite)}`}
                       </span>
+                      {l.origemValor === "MANUAL" && (
+                        <button type="button" className="text-xs text-muted-foreground underline hover:text-foreground" disabled={salvandoValor === l.codigoNFe} onClick={() => fixarValor(l.codigoNFe, "")}>
+                          voltar ao automático
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
