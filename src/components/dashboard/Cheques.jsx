@@ -9,16 +9,49 @@ const situacao = (c) =>
   c.status === "ENVIADO" ? `Cheque enviado para ${c.fornecedorNome}` : c.status === "DEVOLVIDO" ? "Cheque devolvido" : "Cheque no caixa";
 const COR = { CAIXA: "success", ENVIADO: "info", DEVOLVIDO: "danger" };
 
-// Número, banco, bom para e observação do cheque.
-function EditarCheque({ cheque, onFechar, onSalvo }) {
-  const [f, setF] = useState({ numero: cheque.numero || "", banco: cheque.banco || "", bomPara: cheque.bomPara || "", observacao: cheque.observacao || "" });
+const somarDias = (iso, dias) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+const centavos = (v) => Math.round(Number(String(v ?? "").replace(/\./g, "").replace(",", ".")) * 100) || 0;
+const campoValor = (v) => Number(v || 0).toFixed(2).replace(".", ",");
+
+// Cheques do pedido: quantos cheques, e valor, bom para, nº e banco de cada.
+// Trocar a quantidade divide o total em partes iguais (o último acerta os
+// centavos), com bom para de 30 em 30 dias a partir do primeiro.
+function EditarCheques({ cheque, todos, onFechar, onSalvo }) {
+  const grupo = todos.filter((c) => c.grupo === cheque.grupo).sort((a, b) => a.ordem - b.ordem);
+  const total = grupo.reduce((s, c) => s + Math.round(c.valor * 100), 0);
+  const travado = grupo.some((c) => c.status !== "CAIXA");
+  const [linhas, setLinhas] = useState(() =>
+    grupo.map((c) => ({ id: c.id, valor: campoValor(c.valor), bomPara: c.bomPara || "", numero: c.numero || "", banco: c.banco || "", status: c.status, fornecedorNome: c.fornecedorNome })),
+  );
+  const [observacao, setObservacao] = useState(cheque.observacao || "");
   const [salvando, setSalvando] = useState(false);
   const toast = useToast();
+  const soma = linhas.reduce((s, l) => s + centavos(l.valor), 0);
+
+  const dividir = (qtd) => {
+    const parte = Math.floor(total / qtd);
+    const primeira = linhas[0]?.bomPara || cheque.bomPara || cheque.recebidoEm || "";
+    setLinhas(
+      Array.from({ length: qtd }, (_, i) => ({
+        ...(linhas[i] || { numero: "", banco: linhas[0]?.banco || "" }),
+        valor: campoValor((i === qtd - 1 ? total - parte * (qtd - 1) : parte) / 100),
+        bomPara: primeira ? somarDias(primeira, 30 * i) : "",
+        status: linhas[i]?.status || "CAIXA",
+      })),
+    );
+  };
+  const alterar = (i, campo, valor) => setLinhas(linhas.map((l, j) => (j === i ? { ...l, [campo]: valor } : l)));
+
   const salvar = async () => {
     setSalvando(true);
     try {
-      await api.put(`/cheques/${cheque.id}`, f);
-      toast({ titulo: "Cheque atualizado" });
+      await api.put(`/cheques/${cheque.id}/distribuir`, { cheques: linhas.map(({ id, valor, bomPara, numero, banco }) => ({ id, valor: centavos(valor) / 100, bomPara, numero, banco })) });
+      if (observacao !== (cheque.observacao || "") && linhas.some((l) => l.id === cheque.id)) await api.put(`/cheques/${cheque.id}`, { observacao });
+      toast({ titulo: linhas.length > 1 ? `Pedido dividido em ${linhas.length} cheques` : "Cheque atualizado" });
       onSalvo();
     } catch (e) {
       toast({ titulo: "Erro ao salvar", descricao: mensagemErro(e), tipo: "erro" });
@@ -26,31 +59,64 @@ function EditarCheque({ cheque, onFechar, onSalvo }) {
       setSalvando(false);
     }
   };
+
   return (
     <Dialog
       aberto
       onFechar={onFechar}
-      titulo={`Dados do cheque · Pedido ${cheque.pedidoNumeroFormatado}`}
-      descricao={`${cheque.clienteNome} · ${moeda(cheque.valor)}`}
+      tamanho="lg"
+      titulo={`Cheques do pedido ${cheque.pedidoNumeroFormatado}`}
+      descricao={`${cheque.clienteNome} · total ${moeda(total / 100)}`}
       rodape={
         <>
           <Button variant="outline" onClick={onFechar}>Cancelar</Button>
-          <Button loading={salvando} onClick={salvar}>Salvar</Button>
+          <Button loading={salvando} disabled={soma !== total} onClick={salvar}>Salvar</Button>
         </>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Nº do cheque">
-          <Input autoFocus value={f.numero} onChange={(e) => setF({ ...f, numero: e.target.value })} />
-        </Field>
-        <Field label="Banco do cheque">
-          <Input value={f.banco} onChange={(e) => setF({ ...f, banco: e.target.value })} placeholder="Ex.: Itaú" />
-        </Field>
-        <Field label="Bom para">
-          <Input type="date" value={f.bomPara} onChange={(e) => setF({ ...f, bomPara: e.target.value })} />
-        </Field>
-        <Field label="Observação" className="sm:col-span-3">
-          <Textarea rows={2} value={f.observacao} onChange={(e) => setF({ ...f, observacao: e.target.value })} />
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Quantidade de cheques" className="w-48">
+            <Select value={linhas.length} disabled={travado} onChange={(e) => dividir(Number(e.target.value))}>
+              {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>{n} {n === 1 ? "cheque" : "cheques"}</option>
+              ))}
+            </Select>
+          </Field>
+          <Button variant="outline" disabled={travado} onClick={() => dividir(linhas.length)}>
+            Dividir igualmente (30 em 30 dias)
+          </Button>
+        </div>
+        {travado && (
+          <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+            Há cheque deste pedido enviado ou devolvido: dá para editar nº, banco e bom para, mas para mudar valores ou a quantidade volte esses cheques ao caixa primeiro.
+          </p>
+        )}
+        <div className="space-y-2">
+          {linhas.map((l, i) => (
+            <div key={l.id || `novo-${i}`} className="grid grid-cols-2 gap-2 rounded-lg border border-border p-2 sm:grid-cols-[2.5rem_1fr_1fr_9.5rem_8rem] sm:items-end">
+              <span className="col-span-2 text-sm font-semibold sm:col-span-1 sm:pb-2">{i + 1}º</span>
+              <Field label="Nº do cheque">
+                <Input value={l.numero} onChange={(e) => alterar(i, "numero", e.target.value)} />
+              </Field>
+              <Field label="Banco">
+                <Input value={l.banco} onChange={(e) => alterar(i, "banco", e.target.value)} placeholder="Ex.: Itaú" />
+              </Field>
+              <Field label="Bom para">
+                <Input type="date" value={l.bomPara} onChange={(e) => alterar(i, "bomPara", e.target.value)} />
+              </Field>
+              <Field label={l.status !== "CAIXA" ? (l.status === "ENVIADO" ? `Valor (com ${l.fornecedorNome})` : "Valor (devolvido)") : "Valor"}>
+                <Input inputMode="decimal" value={l.valor} disabled={travado} onChange={(e) => alterar(i, "valor", e.target.value.replace(/[^\d,.]/g, ""))} />
+              </Field>
+            </div>
+          ))}
+        </div>
+        <p className={cx("text-right text-sm", soma === total ? "text-emerald-700" : "font-semibold text-amber-700")}>
+          Soma dos cheques {moeda(soma / 100)} de {moeda(total / 100)}
+          {soma !== total && ` · ${soma > total ? "sobram" : "faltam"} ${moeda(Math.abs(total - soma) / 100)}`}
+        </p>
+        <Field label="Observação deste cheque (opcional)">
+          <Textarea rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} />
         </Field>
       </div>
     </Dialog>
@@ -124,7 +190,7 @@ function MudarStatus({ cheque, status, onFechar, onSalvo }) {
   );
 }
 
-function TabelaCheques({ cheques, onAtualizar }) {
+function TabelaCheques({ cheques, todos, onAtualizar }) {
   const [acao, setAcao] = useState(null);
   const toast = useToast();
   const voltarCaixa = async (c) => {
@@ -157,6 +223,7 @@ function TabelaCheques({ cheques, onAtualizar }) {
               <Td className="text-left">{c.clienteNome}</Td>
               <Td>{data(c.recebidoEm)}</Td>
               <Td className="text-xs">
+                {c.totalGrupo > 1 && <span className="mr-1 rounded bg-slate-100 px-1 font-semibold">{c.posicao}/{c.totalGrupo}</span>}
                 {c.numero ? <span className="font-medium">nº {c.numero}</span> : <span className="text-muted-foreground">sem nº</span>}
                 {c.banco && <span className="block">{c.banco}</span>}
                 {c.bomPara && <span className="block text-muted-foreground">bom para {data(c.bomPara)}</span>}
@@ -184,7 +251,7 @@ function TabelaCheques({ cheques, onAtualizar }) {
               </Td>
               <Td>
                 <div className="flex flex-wrap justify-end gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => setAcao({ tipo: "editar", cheque: c })} aria-label="Dados do cheque" title="Nº, banco e bom para">
+                  <Button size="icon" variant="ghost" onClick={() => setAcao({ tipo: "editar", cheque: c })} aria-label="Cheques do pedido" title="Dividir em vários cheques, valor, nº, banco e bom para">
                     <Pencil className="h-4 w-4" />
                   </Button>
                   {c.status === "CAIXA" && (
@@ -208,7 +275,7 @@ function TabelaCheques({ cheques, onAtualizar }) {
           ))}
         </tbody>
       </Table>
-      {acao?.tipo === "editar" && <EditarCheque cheque={acao.cheque} onFechar={() => setAcao(null)} onSalvo={() => { setAcao(null); onAtualizar(); }} />}
+      {acao?.tipo === "editar" && <EditarCheques cheque={acao.cheque} todos={todos} onFechar={() => setAcao(null)} onSalvo={() => { setAcao(null); onAtualizar(); }} />}
       {(acao?.tipo === "ENVIADO" || acao?.tipo === "DEVOLVIDO") && (
         <MudarStatus cheque={acao.cheque} status={acao.tipo} onFechar={() => setAcao(null)} onSalvo={() => { setAcao(null); onAtualizar(); }} />
       )}
@@ -307,7 +374,7 @@ export default function Cheques({ periodo }) {
               <input className="input h-9 pl-9" placeholder="Cliente, pedido, nº, fornecedor..." value={busca} onChange={(e) => setBusca(e.target.value)} />
             </div>
           </div>
-          <TabelaCheques cheques={lista} onAtualizar={() => setRecarregar((n) => n + 1)} />
+          <TabelaCheques cheques={lista} todos={d.cheques} onAtualizar={() => setRecarregar((n) => n + 1)} />
         </>
       )}
     </div>
