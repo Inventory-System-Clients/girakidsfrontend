@@ -28,7 +28,7 @@ import EmitirNotaDialog from "./EmitirNotaDialog";
 import SeletorTransportadora from "../checkout/SeletorTransportadora";
 import { FotosUpload } from "./Fotos";
 import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
-import { EditorMescla, dadosReabertura, itensDoPedido } from "../../pages/Checkout";
+import { EditorMescla, dadosReabertura, itensDoPedido, mesclaParaEnvio } from "../../pages/Checkout";
 import { useCart } from "../../contexts/CartContext";
 import { data, hojeISO, lerNumero, moeda } from "../../utils/format";
 import { FORMAS_PAGAMENTO, METODOS_ENVIO, nomeForma } from "../../utils/status";
@@ -346,6 +346,13 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [salvo, setSalvo] = useState(null);
+  // Taxas do cartão (para a parte no cartão da mescla).
+  const [opcoesCheckout, setOpcoesCheckout] = useState(null);
+  useEffect(() => {
+    api.get("/checkout/opcoes").then(({ data }) => setOpcoesCheckout(data)).catch(() => {});
+  }, []);
+  // Valor do pedido sem as taxas da forma atual: é ele que se divide na mescla.
+  const base = Math.round((Number(pedido.total) - Number(pedido.taxas || 0)) * 100) / 100;
   const toast = useToast();
   const cartao = ["CREDITO_ONLINE", "CREDITO_LINK", "LINK_PAGAMENTO", "MAQUININHA"].includes(forma);
 
@@ -355,7 +362,7 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
       const { data: d } = await api.put(`/pedidos/${pedido.id}/forma-pagamento`, {
         formaPagamento: forma,
         parcelasCartao: cartao ? parcelas : null,
-        composicaoPagamento: forma === "MESCLA" ? mescla.map((l) => ({ ...l, valor: lerNumero(l.valor) })) : null,
+        composicaoPagamento: forma === "MESCLA" ? mesclaParaEnvio(mescla, opcoesCheckout) : null,
         motivo,
       });
       toast({ titulo: "Forma de pagamento alterada", descricao: `Novo total: ${moeda(d.total)}` });
@@ -412,8 +419,10 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
         </div>
         {forma === "MESCLA" && (
           <>
-            <p className="text-sm text-muted-foreground">Informe como o total será dividido. Cada forma pode ter seu próprio vencimento.</p>
-            <EditorMescla linhas={mescla} onChange={setMescla} total={pedido.total} formas={FORMAS} />
+            <p className="text-sm text-muted-foreground">
+              Informe como o valor de {moeda(base)} (sem taxas) será dividido. Cada forma pode ter seu próprio vencimento; a parte no cartão (maquininha, link) ganha a taxa das parcelas escolhidas.
+            </p>
+            <EditorMescla linhas={mescla} onChange={setMescla} total={base} formas={FORMAS} opcoes={opcoesCheckout} />
           </>
         )}
         <Field label="Motivo (opcional)">

@@ -220,14 +220,38 @@ function CarregarPedido({ onCarregado }) {
   );
 }
 
-// Mescla de pagamentos: divide o total entre formas com vencimentos próprios.
-export function EditorMescla({ linhas, onChange, total, formas }) {
-  const soma = linhas.reduce((s, l) => s + lerNumero(l.valor), 0);
+// Mescla: a parte no cartão (maquininha, link, crédito) ganha a mesma taxa
+// que o pedido inteiro teria nessa forma e parcelas; as outras formas, a taxa
+// delas (PIX, boleto... sem taxa). Igual ao cálculo do servidor.
+const CARTOES = ["CREDITO_ONLINE", "CREDITO_LINK", "LINK_PAGAMENTO", "MAQUININHA"];
+const ehCartao = (metodo, opcoes) => CARTOES.includes(metodo) || Boolean(opcoes?.formas?.find((f) => f.codigo === metodo)?.cartao);
+export const calcularMescla = (linhas, opcoes) =>
+  linhas.map((l) => {
+    const valor = lerNumero(l.valor);
+    const cartao = ehCartao(l.metodo, opcoes);
+    const parcelas = cartao ? Number(l.parcelas) || 1 : null;
+    const percentual = cartao ? Number((opcoes?.taxasCartao || TAXAS_CARTAO)[parcelas] || 0) : Number(opcoes?.formas?.find((f) => f.codigo === l.metodo)?.taxa || 0);
+    const taxa = Math.round(valor * percentual) / 100;
+    return { ...l, valor, parcelas, cartao, percentual, taxa, valorCobrado: Math.round((valor + taxa) * 100) / 100 };
+  });
+// O que vai para o servidor (parcelas sempre informadas nas linhas de cartão).
+export const mesclaParaEnvio = (linhas, opcoes) =>
+  calcularMescla(linhas, opcoes).map(({ metodo, valor, vencimento, parcelas }) => ({ metodo, valor, vencimento, parcelas }));
+
+// Mescla de pagamentos: divide o valor (sem taxas) entre formas com
+// vencimentos próprios; a parte no cartão mostra a taxa e quanto será cobrado.
+export function EditorMescla({ linhas, onChange, total, formas, opcoes }) {
+  const calculadas = calcularMescla(linhas, opcoes);
+  const soma = calculadas.reduce((s, l) => s + l.valor, 0);
+  const taxas = calculadas.reduce((s, l) => s + l.taxa, 0);
+  const tabela = opcoes?.taxasCartao || TAXAS_CARTAO;
+  const alterar = (i, campos) => onChange(linhas.map((x, j) => (j === i ? { ...x, ...campos } : x)));
   return (
     <div className="space-y-2 rounded-lg border border-border bg-slate-50 p-3">
       {linhas.map((l, i) => (
-        <div key={i} className="grid grid-cols-[1fr_7rem_9rem_auto] gap-2">
-          <Select value={l.metodo} onChange={(e) => onChange(linhas.map((x, j) => (j === i ? { ...x, metodo: e.target.value } : x)))}>
+        <div key={i} className="space-y-1">
+        <div className="grid grid-cols-[1fr_7rem_9rem_auto] gap-2">
+          <Select value={l.metodo} onChange={(e) => alterar(i, { metodo: e.target.value, parcelas: ehCartao(e.target.value, opcoes) ? l.parcelas || 1 : null })}>
             {formas.filter((f) => f !== "MESCLA").map((f) => (
               <option key={f} value={f}>
                 {FORMAS_PAGAMENTO[f]?.label || f}
@@ -240,13 +264,31 @@ export function EditorMescla({ linhas, onChange, total, formas }) {
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
+        {calculadas[i].cartao && (
+          <div className="flex flex-wrap items-center gap-2 pl-1 text-xs text-muted-foreground">
+            <Select className="h-8 w-40 text-xs" value={calculadas[i].parcelas} onChange={(e) => alterar(i, { parcelas: Number(e.target.value) })}>
+              {Object.keys(tabela).map((n) => (
+                <option key={n} value={n}>
+                  {n === "1" ? "À vista" : `${n}x`} (+{String(tabela[n]).replace(".", ",")}%)
+                </option>
+              ))}
+            </Select>
+            {calculadas[i].valor > 0 && (
+              <span>
+                + taxa {moeda(calculadas[i].taxa)} → cobrar <b className="text-foreground">{moeda(calculadas[i].valorCobrado)}</b> nessa forma
+              </span>
+            )}
+          </div>
+        )}
+        </div>
       ))}
       <div className="flex items-center justify-between text-sm">
         <Button variant="outline" size="sm" onClick={() => onChange([...linhas, { metodo: "PIX_PRESENCIAL", valor: "", vencimento: hojeISO() }])}>
           <Plus className="h-4 w-4" /> Adicionar forma
         </Button>
-        <span className={cx(Math.abs(soma - total) > 0.01 ? "text-amber-700" : "text-emerald-700")}>
+        <span className={cx("text-right", Math.abs(soma - total) > 0.01 ? "text-amber-700" : "text-emerald-700")}>
           Informado {moeda(soma)} de {moeda(total)}
+          {taxas > 0 && <span className="block text-xs text-muted-foreground">+ {moeda(taxas)} de taxa do cartão = {moeda(soma + taxas)}</span>}
         </span>
       </div>
     </div>
@@ -392,7 +434,8 @@ export default function Checkout({ modo = "pedido" }) {
       .catch(() => setMaquininhas([]));
   }, [maquininhaIntegrada, maquininhas]);
   const percentual = config?.cartao ? (opcoes?.taxasCartao || TAXAS_CARTAO)[parcelas] || 0 : config?.taxa || 0;
-  const taxas = Math.round(base * percentual) / 100;
+  // Mescla: só a parte no cartão paga taxa (a de cada linha).
+  const taxas = forma === "MESCLA" ? calcularMescla(mescla, opcoes).reduce((s, l) => s + l.taxa, 0) : Math.round(base * percentual) / 100;
   const total = base + taxas;
 
   // pedidoPeloGiraldo: o resultado volta para a conversa do Giraldo.
@@ -432,7 +475,7 @@ export default function Checkout({ modo = "pedido" }) {
         freteAdicional: adicionalNum,
         formaPagamento: forma || "A_DEFINIR",
         parcelasCartao: config?.cartao ? parcelas : null,
-        composicaoPagamento: forma === "MESCLA" ? mescla.map((l) => ({ ...l, valor: lerNumero(l.valor) })) : null,
+        composicaoPagamento: forma === "MESCLA" ? mesclaParaEnvio(mescla, opcoes) : null,
         usarCredito,
         transportadora:
           metodoEnvio === "TRANSPORTADORA" && transportadora
@@ -1022,7 +1065,7 @@ export default function Checkout({ modo = "pedido" }) {
             )}
             {forma === "MESCLA" && (
               <div className="mt-4">
-                <EditorMescla linhas={mescla} onChange={setMescla} total={total} formas={formasVisiveis.map((f) => f.codigo)} />
+                <EditorMescla linhas={mescla} onChange={setMescla} total={base} formas={formasVisiveis.map((f) => f.codigo)} opcoes={opcoes} />
               </div>
             )}
             {creditoDisponivel > 0 && (
@@ -1039,7 +1082,7 @@ export default function Checkout({ modo = "pedido" }) {
             {creditoUsado > 0 && <Linha rotulo="Crédito" valor={`- ${moeda(creditoUsado)}`} />}
             <Linha rotulo="Frete" valor={!metodoEnvio ? "A definir" : metodoEnvio === "RETIRAR_LOCAL" ? "Grátis" : metodoEnvio === "TRANSPORTADORA" ? "A combinar" : moeda(valorFrete)} />
             {adicionalNum > 0 && <Linha rotulo="Custo adicional" valor={moeda(adicionalNum)} />}
-            {taxas > 0 && <Linha rotulo={`Taxas (${String(percentual).replace(".", ",")}%)`} valor={moeda(taxas)} />}
+            {taxas > 0 && <Linha rotulo={forma === "MESCLA" ? "Taxas (parte no cartão)" : `Taxas (${String(percentual).replace(".", ",")}%)`} valor={moeda(taxas)} />}
             <div className="flex justify-between border-t border-border pt-3 text-lg font-bold">
               <span>Total</span>
               <span className="text-primary">{moeda(total)}</span>
