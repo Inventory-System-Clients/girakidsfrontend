@@ -33,6 +33,7 @@ import GraficoResumo from "../components/dashboard/GraficoResumo";
 import ProdutosAtivos from "../components/dashboard/ProdutosAtivos";
 import SetorCompras from "../components/dashboard/SetorCompras";
 import Boletos from "../components/dashboard/Boletos";
+import Cheques from "../components/dashboard/Cheques";
 import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaFinanceiro, CelulaMetodo, CelulaNumero, CelulaVendas } from "../components/pedido/StatusCelulas";
 import { dataHora, exportarCsv, hojeISO, inicioMesISO, lerNumero, moeda, numero, percentual } from "../utils/format";
 import { FINANCEIRO, FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
@@ -745,6 +746,7 @@ const ABAS = [
   { value: "pedidos", label: "Pedidos expedidos" },
   { value: "estoque", label: "Estoque" },
   { value: "boletos", label: "Boletos" },
+  { value: "cheques", label: "Cheques" },
   { value: "compras", label: "🛒 Setor de compras" },
   { value: "analise", label: "📊 Análise" },
 ];
@@ -781,6 +783,7 @@ export default function Dashboard() {
       </div>
       {aba === "resumo" && <Resumo periodo={periodo} onAbrirBoletos={() => setParams({ view: "boletos" })} />}
       {aba === "boletos" && <Boletos />}
+      {aba === "cheques" && <Cheques periodo={periodo} />}
       {aba === "meta" && <Meta periodo={periodo} />}
       {aba === "pedidos" && <PedidosExpedidos periodo={periodo} />}
       {aba === "estoque" && <Estoque periodo={periodo} />}
