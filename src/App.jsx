@@ -17,6 +17,7 @@ import { useLocation } from "react-router-dom";
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Pagamento = lazy(() => import("./pages/Pagamento"));
 const MeusPedidos = lazy(() => import("./pages/MeusPedidos"));
+const AcompanharPedido = lazy(() => import("./pages/AcompanharPedido"));
 const Perfil = lazy(() => import("./pages/Perfil"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const HistoricoPedidos = lazy(() => import("./pages/HistoricoPedidos"));
@@ -99,6 +100,7 @@ export default function App() {
                   <Route path="/checkout" element={<Protegida><Checkout /></Protegida>} />
                   <Route path="/pagamento/:id" element={<Protegida><Pagamento /></Protegida>} />
                   <Route path="/meus-pedidos" element={<Protegida semShowroom><MeusPedidos /></Protegida>} />
+                  <Route path="/acompanhamento/:id/:assinatura" element={<AcompanharPedido />} />
                   <Route path="/perfil" element={<Protegida semShowroom><Perfil /></Protegida>} />
                   <Route path="/dashboard" element={<Protegida permissoes={["FINANCEIRO"]}><Dashboard /></Protegida>} />
                   <Route path="/historico-pedidos" element={<Protegida permissoes={["VENDAS"]}><HistoricoPedidos /></Protegida>} />

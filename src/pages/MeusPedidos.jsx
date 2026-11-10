@@ -1,77 +1,77 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Package } from "lucide-react";
 import api from "../services/api";
-import { Badge, Button, Card, EmptyState, PageHeader, Skeleton } from "../components/ui";
+import { Button, Card, EmptyState, PageHeader, Skeleton, Tabs } from "../components/ui";
 import PedidoDetalhes from "../components/pedido/PedidoDetalhes";
-import { data, moeda } from "../utils/format";
-import { METODOS_ENVIO, nomeForma } from "../utils/status";
+import { CartaoAcompanhamento } from "../components/pedido/Acompanhamento";
 import { WHATSAPP_LINK_REDE, aceitaLinkRede, mensagemPedirLinkRede } from "../components/pedido/LinkRedeDialog";
 import { BotaoWhatsapp } from "../components/Whatsapp";
+import { moeda } from "../utils/format";
 
-const situacao = (p) => {
-  if (p.statusVendas === "CANCELADO") return ["Cancelado", "danger"];
-  if (p.statusExpedicao === "EXPEDIDO") return ["Expedido", "success"];
-  if (p.statusExpedicao === "MONTAGEM") return ["Em montagem", "info"];
-  if (p.statusFinanceiro === "PAGO") return ["Pagamento confirmado", "success"];
-  return ["Em aberto", "warning"];
-};
+const POR_PAGINA = 20;
+const ABAS = [
+  { value: "andamento", label: "Em andamento" },
+  { value: "concluidos", label: "Concluídos" },
+];
+// Rastreio carregado sozinho só dos envios recentes (os antigos, no botão).
+const recente = (p) => p.expedidoEm && Date.now() - new Date(p.expedidoEm).getTime() < 30 * 86_400_000;
 
 export default function MeusPedidos() {
+  const [aba, setAba] = useState("andamento");
   const [pedidos, setPedidos] = useState(null);
   const [temMais, setTemMais] = useState(false);
   const [ver, setVer] = useState(null);
 
-  const carregar = (offset = 0) =>
-    api.get("/pedidos/meus", { params: { offset, limite: 20 } }).then(({ data: d }) => {
-      setPedidos((atual) => (offset ? [...atual, ...d] : d));
-      setTemMais(d.length === 20);
-    });
+  const carregar = useCallback(
+    (offset = 0) =>
+      api.get("/pedidos/meus", { params: { offset, limite: POR_PAGINA, situacao: aba } }).then(({ data: d }) => {
+        setPedidos((atual) => (offset ? [...(atual || []), ...d] : d));
+        setTemMais(d.length === POR_PAGINA);
+      }),
+    [aba],
+  );
   useEffect(() => {
     carregar();
-  }, []);
+  }, [carregar]);
+
+  const trocarAba = (nova) => {
+    setPedidos(null);
+    setAba(nova);
+  };
 
   return (
     <div className="container-app py-6">
-      <PageHeader titulo="Meus Pedidos" subtitulo="Acompanhe seus pedidos realizados na Gira Kids." />
+      <PageHeader titulo="Meus Pedidos" subtitulo="Acompanhe o pagamento, a separação e o envio dos seus pedidos." />
+      <Tabs abas={ABAS} ativa={aba} onChange={trocarAba} className="mb-4" />
       {!pedidos && <Skeleton className="h-40" />}
       {pedidos?.length === 0 && (
         <Card>
-          <EmptyState icon={Package} titulo="Nenhum pedido encontrado" descricao="Quando você finalizar um pedido, ele aparecerá aqui para consulta.">
+          <EmptyState
+            icon={Package}
+            titulo={aba === "andamento" ? "Nenhum pedido em andamento" : "Nenhum pedido concluído"}
+            descricao={aba === "andamento" ? "Quando você fizer um pedido, o andamento dele aparece aqui." : "Os pedidos enviados ficam guardados aqui."}
+          >
             <Link to="/">
               <Button className="mt-3">Ver catálogo</Button>
             </Link>
           </EmptyState>
         </Card>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {pedidos?.map((p) => {
-          const [rotulo, cor] = situacao(p);
-          return (
-            <Card key={p.id} className="flex flex-col gap-2 p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold">Pedido {p.numeroFormatado}</p>
-                <Badge variant={cor}>{rotulo}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">Pedido realizado em {data(p.createdAt)}</p>
-              <p className="text-sm">
-                {p.quantidadeItens} {p.quantidadeItens === 1 ? "item" : "itens"} · {nomeForma(p.formaPagamento)} · {METODOS_ENVIO[p.metodoEnvio] || "-"}
-              </p>
-              {p.codigoRastreio && <p className="text-sm">Rastreio: <strong>{p.codigoRastreio}</strong></p>}
-              {p.statusFinanceiro !== "PAGO" && p.statusVendas !== "CANCELADO" && aceitaLinkRede(p) && (
-                <BotaoWhatsapp telefone={WHATSAPP_LINK_REDE} className="w-full" texto={mensagemPedirLinkRede(p)}>
-                  Solicitar link de pagamento
-                </BotaoWhatsapp>
-              )}
-              <div className="mt-auto flex items-center justify-between pt-2">
-                <span className="text-lg font-bold text-primary">{moeda(p.total)}</span>
-                <Button variant="outline" size="sm" onClick={() => setVer(p.id)}>
-                  Ver detalhes
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {pedidos?.map((p) => (
+          <CartaoAcompanhamento key={p.id} pedido={p} urlRastreio={`/pedidos/${p.id}/rastreio`} rastreioAutomatico={recente(p)}>
+            <span className="mr-auto text-lg font-bold text-primary">{moeda(p.total)}</span>
+            {p.statusFinanceiro !== "PAGO" && p.statusVendas !== "CANCELADO" && aceitaLinkRede(p) && (
+              <BotaoWhatsapp telefone={WHATSAPP_LINK_REDE} texto={mensagemPedirLinkRede(p)}>
+                Solicitar link de pagamento
+              </BotaoWhatsapp>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setVer(p.id)}>
+              Ver detalhes
+            </Button>
+          </CartaoAcompanhamento>
+        ))}
       </div>
       {temMais && (
         <div className="mt-6 text-center">

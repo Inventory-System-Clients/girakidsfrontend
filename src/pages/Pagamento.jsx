@@ -93,9 +93,13 @@ export default function Pagamento() {
   return (
     <div className="toy-pattern-bg min-h-[calc(100dvh-4rem)] px-4 py-10">
       <Card className="mx-auto max-w-lg p-8 text-center">
-        {pago ? <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-500" /> : <Clock className="mx-auto h-14 w-14 text-primary" />}
-        <h1 className="mt-3 text-2xl font-bold">{pago ? "Pagamento confirmado!" : clientePedeLink ? "Pedido confirmado!" : "Seu pedido foi salvo!"}</h1>
-        <p className="mt-1 text-muted-foreground">
+        <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-500" />
+        <h1 className="mt-3 text-3xl font-extrabold leading-tight text-emerald-600 sm:text-4xl">Pedido concluído com sucesso!</h1>
+        <p className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${pago ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+          {pago ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+          {pago ? "Pagamento confirmado" : "Aguardando pagamento"}
+        </p>
+        <p className="mt-2 text-muted-foreground">
           Pedido <strong>{pedido.numeroFormatado}</strong> · {moeda(pedido.total)} · {nomeForma(pedido.formaPagamento)}
         </p>
         {naMaquininha && (
@@ -185,8 +189,8 @@ export default function Pagamento() {
           </Button>
           {!showroom && (
             <Link to={interno ? "/historico-pedidos" : "/meus-pedidos"}>
-              <Button variant="ghost" className="w-full">
-                {interno ? "Ir para o histórico de pedidos" : "Ver meus pedidos"}
+              <Button variant={interno ? "ghost" : "outline"} className="w-full">
+                {interno ? "Ir para o histórico de pedidos" : "Acompanhar meus pedidos"}
               </Button>
             </Link>
           )}

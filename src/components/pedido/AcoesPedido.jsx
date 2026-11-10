@@ -20,6 +20,7 @@ import {
   Smartphone,
   Copy,
   Link2,
+  Share2,
 } from "lucide-react";
 import QRCode from "qrcode";
 import api, { enviarArquivo, mensagemErro } from "../../services/api";
@@ -1088,6 +1089,22 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
     if (fechar) setDialogo(null);
   };
 
+  // Link para o cliente acompanhar o pedido (abre sem login).
+  const copiarAcompanhamento = async () => {
+    try {
+      const { data: d } = await api.get(`/pedidos/${pedido.id}/link-acompanhamento`);
+      const url = `${window.location.origin}${d.caminho}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast({ titulo: "Link de acompanhamento copiado", descricao: "Cole na conversa com o cliente." });
+      } catch {
+        await confirmar({ titulo: "Link de acompanhamento", mensagem: url, confirmar: "Fechar", cancelar: "Voltar" });
+      }
+    } catch (error) {
+      toast({ titulo: "Não foi possível gerar o link", descricao: mensagemErro(error), tipo: "erro" });
+    }
+  };
+
   const baixarPdf = async () => {
     const { data: d } = await api.get(`/pedidos/${pedido.id}`);
     gerarPdfPedido(d);
@@ -1175,6 +1192,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
             { label: "Ver pedido", icone: Eye, onClick: () => setVerId(pedido.id) },
             { label: "Baixar PDF", icone: FileDown, onClick: baixarPdf },
             { label: expedido ? "Ver montagem e fotos" : "Montar pedido", icone: ListChecks, onClick: () => navigate(`/expedicao/${pedido.id}`) },
+            { label: "Copiar link de acompanhamento", icone: Share2, onClick: copiarAcompanhamento },
             pedido.checklist?.conferidos > 0 && !expedido && { label: "Desfazer montagem", icone: Undo2, onClick: desfazer },
             !expedido && { label: "Expedir", icone: Truck, disabled: !pedido.checklist?.completo, onClick: () => comCompleto("expedir") },
             { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
@@ -1183,6 +1201,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
         : [
             { label: "Ver pedido", icone: Eye, onClick: () => setVerId(pedido.id) },
             { label: "Baixar PDF", icone: FileDown, onClick: baixarPdf },
+            { label: "Copiar link de acompanhamento", icone: Share2, onClick: copiarAcompanhamento },
             contexto === "vendas" && ativo && !expedido && pode("VENDAS") && { label: "Editar pedido", icone: Pencil, onClick: editar },
             contexto === "vendas" && ativo && pedido.statusVendas === "AGUARDANDO" && financeiro && { label: "Liberar para expedição", icone: ClipboardCheck, cor: "font-semibold text-blue-700 hover:bg-blue-50", onClick: () => comCompleto("liberar") },
             contexto === "vendas" && ativo && pedido.statusFinanceiro === "AGUARDANDO_PAGAMENTO" && financeiro && {
