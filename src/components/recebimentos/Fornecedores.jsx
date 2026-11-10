@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Pencil, Plus, Search, Trash2, Truck } from "lucide-react";
+import { KeyRound, Pencil, Plus, Search, Trash2, Truck } from "lucide-react";
 import api, { mensagemErro } from "../../services/api";
 import { Badge, Button, Dialog, EmptyState, Field, Input, Switch, Table, Td, Textarea, Th, useConfirm, useToast } from "../ui";
 import { BotaoWhatsapp } from "../Whatsapp";
+import AcessoFornecedor from "./AcessoFornecedor";
 import { contemTexto, mascaraDocumento, mascaraTelefone } from "../../utils/format";
 
 export function FornecedorForm({ fornecedor, onFechar, onSalvo }) {
@@ -75,6 +76,7 @@ export default function Fornecedores({ fornecedores, onAtualizar }) {
   const [busca, setBusca] = useState("");
   const [form, setForm] = useState(undefined);
   const [excluindo, setExcluindo] = useState(null);
+  const [acesso, setAcesso] = useState(null);
   const toast = useToast();
   const confirmar = useConfirm();
   const excluir = async (f) => {
@@ -144,6 +146,9 @@ export default function Fornecedores({ fornecedores, onAtualizar }) {
                 </Td>
                 <Td>
                   <div className="flex justify-end gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => setAcesso(f)} aria-label="Portal do fornecedor" title="Login do fornecedor e itens que ele traz">
+                      <KeyRound className="h-4 w-4" />
+                    </Button>
                     <Button size="icon" variant="ghost" onClick={() => setForm(f)} aria-label="Editar">
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -157,6 +162,7 @@ export default function Fornecedores({ fornecedores, onAtualizar }) {
           </tbody>
         </Table>
       )}
+      {acesso && <AcessoFornecedor fornecedor={acesso} onFechar={() => setAcesso(null)} />}
       {form !== undefined && (
         <FornecedorForm
           fornecedor={form}

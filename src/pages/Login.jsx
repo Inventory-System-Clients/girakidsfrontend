@@ -21,6 +21,7 @@ export default function Login() {
     const r = await login(email, senha);
     setEnviando(false);
     if (!r.success) return setErro(r.error);
+    if (r.usuario.role === "FORNECEDOR") return navigate("/fornecedor/portal", { replace: true });
     navigate(r.usuario.trocarSenha ? "/perfil" : location.state?.de || "/", { replace: true });
   };
 

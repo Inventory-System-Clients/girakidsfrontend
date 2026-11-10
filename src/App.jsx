@@ -31,6 +31,7 @@ const PagamentosConfig = lazy(() => import("./pages/Pagamentos"));
 const WhatsappAvisos = lazy(() => import("./pages/WhatsappAvisos"));
 const SistemaAntigo = lazy(() => import("./pages/SistemaAntigo"));
 const FornecedorRecebimento = lazy(() => import("./pages/FornecedorRecebimento"));
+const PortalFornecedor = lazy(() => import("./pages/PortalFornecedor"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const BuscaTransportadoras = lazy(() => import("./pages/comercial/BuscaTransportadoras").then((m) => ({ default: m.BuscaTransportadoras })));
 const CalculadoraPedidos = lazy(() => import("./pages/comercial/CalculadoraPedidos").then((m) => ({ default: m.CalculadoraPedidos })));
@@ -48,10 +49,19 @@ function GiraldoNoSite() {
   return <Giraldo />;
 }
 
-// Cabeçalho, alertas, WhatsApp e Giraldo ficam fora do link do fornecedor.
+// Login de fornecedor só usa o portal dele.
+function TravaFornecedor() {
+  const { usuario } = useAuth();
+  const { pathname } = useLocation();
+  if (usuario?.role === "FORNECEDOR" && !pathname.startsWith("/fornecedor")) return <Navigate to="/fornecedor/portal" replace />;
+  return null;
+}
+
+// Cabeçalho, alertas, WhatsApp e Giraldo ficam fora do link e do portal do fornecedor.
 function Moldura() {
   const { pathname } = useLocation();
-  if (pathname.startsWith("/fornecedor")) return null;
+  const { usuario } = useAuth();
+  if (pathname.startsWith("/fornecedor") || usuario?.role === "FORNECEDOR") return null;
   return (
     <>
       <Header />
@@ -69,6 +79,7 @@ export default function App() {
         <CartProvider>
           <ToastProvider>
             <ConfirmProvider>
+              <TravaFornecedor />
               <Moldura />
               <Suspense
                 fallback={
@@ -97,6 +108,7 @@ export default function App() {
                   <Route path="/entradas" element={<Protegida permissoes={["ENTRADAS", "RECEBIMENTOS"]}><Entradas /></Protegida>} />
                   <Route path="/recebimentos" element={<Protegida permissoes={["RECEBIMENTOS"]}><Recebimentos /></Protegida>} />
                   <Route path="/fornecedor" element={<FornecedorRecebimento />} />
+                  <Route path="/fornecedor/portal" element={<PortalFornecedor />} />
                   <Route path="/pagamentos" element={<Protegida permissoes={["SOMENTE_ADMIN"]}><PagamentosConfig /></Protegida>} />
                   <Route path="/whatsapp-avisos" element={<Protegida permissoes={["SOMENTE_ADMIN"]}><WhatsappAvisos /></Protegida>} />
                   <Route path="/sistema-antigo" element={<Protegida permissoes={["SOMENTE_ADMIN"]}><SistemaAntigo /></Protegida>} />
