@@ -19,6 +19,7 @@ import {
   Send,
   Smartphone,
   Copy,
+  Link2,
 } from "lucide-react";
 import QRCode from "qrcode";
 import api, { enviarArquivo, mensagemErro } from "../../services/api";
@@ -31,6 +32,7 @@ import { FotosUpload } from "./Fotos";
 import { NovoCustoDialog } from "../../pages/comercial/CustosPosVenda";
 import { EditorBoletos, EditorMescla, boletoPadrao, dadosReabertura, itensDoPedido, mesclaParaEnvio } from "../../pages/Checkout";
 import SelectBanco from "./SelectBanco";
+import LinkRedeDialog, { aceitaLinkRede } from "./LinkRedeDialog";
 import { useCart } from "../../contexts/CartContext";
 import { data, hojeISO, lerNumero, moeda } from "../../utils/format";
 import { FORMAS_PAGAMENTO, METODOS_ENVIO, nomeForma } from "../../utils/status";
@@ -50,11 +52,11 @@ const SelectForma = ({ value, onChange, incluirMescla = false }) => (
 );
 
 // Liberar para expedição / confirmar pagamento / quitar pendência.
-function LiberarDialog({ pedido, modo, onFechar, onFeito }) {
+function LiberarDialog({ pedido, modo, bancoInicial = "", onFechar, onFeito }) {
   const [observacao, setObservacao] = useState("");
   const [metodo, setMetodo] = useState(pedido.formaPagamento === "A_DEFINIR" ? "" : pedido.formaPagamento);
   const [dataRec, setDataRec] = useState(hojeISO());
-  const [banco, setBanco] = useState("");
+  const [banco, setBanco] = useState(bancoInicial);
   const [enviando, setEnviando] = useState(false);
   const toast = useToast();
   const liberar = modo === "liberar";
@@ -1189,6 +1191,12 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
               cor: "font-semibold text-emerald-700 hover:bg-emerald-50",
               onClick: () => comCompleto("pagar"),
             },
+            contexto === "vendas" && ativo && pedido.statusFinanceiro === "AGUARDANDO_PAGAMENTO" && financeiro && aceitaLinkRede(pedido) && {
+              label: pedido.pagamentoLink ? "Link de pagamento Rede" : "Gerar link na Rede",
+              icone: Link2,
+              cor: "font-semibold text-blue-700 hover:bg-blue-50",
+              onClick: () => comCompleto("linkRede"),
+            },
             contexto === "vendas" && ativo && pedido.statusFinanceiro === "AGUARDANDO_PAGAMENTO" && financeiro && { label: "Registrar recebimento", icone: HandCoins, onClick: () => comCompleto("recebimento") },
             contexto === "vendas" && ativo && financeiro && { label: "Controle de parcelas", icone: ListChecks, onClick: () => comCompleto("parcelas") },
             contexto === "vendas" && ativo && financeiro && pedido.formaPagamento === "BOLETO" && pedido.statusFinanceiro !== "PAGO" && { label: "Boletos (vencimentos)", icone: CalendarDays, onClick: () => comCompleto("boletos") },
@@ -1212,7 +1220,10 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
       <RowMenu itens={itens} />
       <PedidoDetalhes pedidoId={verId} onFechar={() => setVerId(null)} />
       {dialogo?.nome === "liberar" && <LiberarDialog {...props} modo="liberar" />}
-      {dialogo?.nome === "pagar" && <LiberarDialog {...props} modo="pagar" />}
+      {dialogo?.nome === "pagar" && <LiberarDialog {...props} modo="pagar" bancoInicial={dialogo.banco} />}
+      {dialogo?.nome === "linkRede" && (
+        <LinkRedeDialog {...props} onConfirmarPagamento={(d) => setDialogo({ nome: "pagar", pedido: d, banco: "Rede parceiro Itau" })} />
+      )}
       {dialogo?.nome === "maquininha" && <MaquininhaDialog {...props} />}
       {dialogo?.nome === "recebimento" && <RecebimentoDialog {...props} />}
       {dialogo?.nome === "parcelas" && <ParcelasDialog {...props} />}

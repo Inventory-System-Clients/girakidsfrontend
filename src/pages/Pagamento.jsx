@@ -8,19 +8,21 @@ import { Button, Card, Spinner, useToast } from "../components/ui";
 import { moeda } from "../utils/format";
 import { FORMAS_PAGAMENTO, nomeForma } from "../utils/status";
 import { gerarPdfPedido } from "../utils/pdf";
+import LinkRedeDialog, { aceitaLinkRede, linkRedeVencido } from "../components/pedido/LinkRedeDialog";
 import { BotaoWhatsapp, useWhatsappComercial } from "../components/Whatsapp";
 
 // Tela pós-checkout: mostra o pedido salvo e, se o pagamento for online,
 // o QR Code/link do banco configurado e atualiza o status sozinha.
 export default function Pagamento() {
   const { id } = useParams();
-  const { interno, showroom } = useAuth();
+  const { interno, showroom, pode } = useAuth();
   const toast = useToast();
   const [pedido, setPedido] = useState(null);
   const [erro, setErro] = useState("");
   const [atualizando, setAtualizando] = useState(false);
   const [qrImagem, setQrImagem] = useState("");
   const [gerando, setGerando] = useState(false);
+  const [linkRede, setLinkRede] = useState(false);
   const whatsappComercial = useWhatsappComercial();
   const online = pedido && ["PIX_ONLINE", "CREDITO_ONLINE", "DEBITO_ONLINE"].includes(pedido.formaPagamento);
   // Cobrança aberta numa maquininha (SumUp/Stone/Point).
@@ -47,6 +49,19 @@ export default function Pagamento() {
     const t = setInterval(consultar, naMaquininha ? 4000 : 8000);
     return () => clearInterval(t);
   }, [online, naMaquininha, pedido?.statusFinanceiro, pedido?.pagamentoReferencia, consultar]);
+
+  // Crédito link: o comercial gera o link na Rede; enquanto ele não chega (ou
+  // até o pagamento ser confirmado) a tela se atualiza sozinha.
+  const comLinkRede = pedido && !online && aceitaLinkRede(pedido) && pedido.statusVendas !== "CANCELADO";
+  const linkRedeAtivo = comLinkRede && pedido.pagamentoLink && !linkRedeVencido(pedido);
+  useEffect(() => {
+    if (!comLinkRede || pedido?.statusFinanceiro === "PAGO") return undefined;
+    const t = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      api.get(`/pedidos/${id}`).then(({ data }) => setPedido(data)).catch(() => {});
+    }, 20000);
+    return () => clearInterval(t);
+  }, [comLinkRede, pedido?.statusFinanceiro, id]);
 
   const cancelarMaquininha = async () => {
     try {
@@ -128,11 +143,32 @@ export default function Pagamento() {
             </Button>
           </div>
         )}
-        {!pago && pedido.formaPagamento === "CREDITO_LINK" && !interno && (
+        {!pago && linkRedeAtivo && (
+          <div className="mt-6 space-y-2">
+            <a href={pedido.pagamentoLink} target="_blank" rel="noopener noreferrer" className="block">
+              <Button variant="success" className="w-full" size="lg">
+                <CreditCard className="h-4 w-4" /> Pagar com cartão
+              </Button>
+            </a>
+            <p className="text-xs text-muted-foreground">
+              Abre a página segura da Rede (Itaú) em outra aba
+              {pedido.pagamentoExpiraEm ? `. O link vale até ${new Date(pedido.pagamentoExpiraEm).toLocaleDateString("pt-BR")}` : ""}.
+            </p>
+          </div>
+        )}
+        {!pago && comLinkRede && !linkRedeAtivo && !interno && (
           <p className="mt-6 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
-            Para pagar no cartão, fale com o comercial no WhatsApp abaixo: enviamos o link de pagamento do pedido {pedido.numeroFormatado}.
+            {pedido.pagamentoLink
+              ? `O link de pagamento venceu. Fale com o comercial no WhatsApp abaixo para receber um novo link do pedido ${pedido.numeroFormatado}.`
+              : `Estamos gerando o link de pagamento do pedido ${pedido.numeroFormatado}: o botão "Pagar com cartão" aparece aqui assim que ficar pronto. Se preferir, fale com o comercial no WhatsApp abaixo.`}
           </p>
         )}
+        {!pago && comLinkRede && interno && pode("VENDAS", "FINANCEIRO") && (
+          <Button variant={linkRedeAtivo ? "outline" : "primary"} className="mt-4 w-full" onClick={() => setLinkRede(true)}>
+            <CreditCard className="h-4 w-4" /> {pedido.pagamentoLink ? "Link de pagamento Rede" : "Gerar link na Rede"}
+          </Button>
+        )}
+        {linkRede && <LinkRedeDialog pedido={pedido} onFechar={() => setLinkRede(false)} onFeito={(d) => setPedido(d)} />}
         <p className="mt-6 text-sm text-muted-foreground">
           {pago
             ? "Seu pagamento foi recebido. O pedido segue para montagem e envio."

@@ -41,7 +41,7 @@ const MENSAGEM_PAGAMENTO = {
   CREDITO_ONLINE: "Toque em \"Pagar com cartão\" na tela para pagar no site do banco.",
   DEBITO_ONLINE: "Toque em \"Pagar com cartão\" na tela para pagar no site do banco.",
   MAQUININHA: "A cobrança foi enviada para a maquininha. Assim que pagar nela, o pedido é confirmado sozinho.",
-  CREDITO_LINK: "Fale com o comercial no WhatsApp para receber o link do cartão.",
+  CREDITO_LINK: "O botão \"Pagar com cartão\" aparece na tela do pedido assim que o comercial gerar o link. Se preferir, fale com ele no WhatsApp.",
 };
 
 const CHAVE_CONVERSA = "girakids_giraldo_conversa";

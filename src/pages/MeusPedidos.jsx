@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Package } from "lucide-react";
+import { CreditCard, Package } from "lucide-react";
 import api from "../services/api";
 import { Badge, Button, Card, EmptyState, PageHeader, Skeleton } from "../components/ui";
 import PedidoDetalhes from "../components/pedido/PedidoDetalhes";
 import { data, moeda } from "../utils/format";
 import { METODOS_ENVIO, nomeForma } from "../utils/status";
+import { aceitaLinkRede, linkRedeVencido } from "../components/pedido/LinkRedeDialog";
 
 const situacao = (p) => {
   if (p.statusVendas === "CANCELADO") return ["Cancelado", "danger"];
@@ -56,6 +57,13 @@ export default function MeusPedidos() {
                 {p.quantidadeItens} {p.quantidadeItens === 1 ? "item" : "itens"} · {nomeForma(p.formaPagamento)} · {METODOS_ENVIO[p.metodoEnvio] || "-"}
               </p>
               {p.codigoRastreio && <p className="text-sm">Rastreio: <strong>{p.codigoRastreio}</strong></p>}
+              {p.statusFinanceiro !== "PAGO" && p.statusVendas !== "CANCELADO" && p.pagamentoLink && aceitaLinkRede(p) && !linkRedeVencido(p) && (
+                <a href={p.pagamentoLink} target="_blank" rel="noopener noreferrer">
+                  <Button variant="success" size="sm" className="w-full">
+                    <CreditCard className="h-4 w-4" /> Pagar com cartão
+                  </Button>
+                </a>
+              )}
               <div className="mt-auto flex items-center justify-between pt-2">
                 <span className="text-lg font-bold text-primary">{moeda(p.total)}</span>
                 <Button variant="outline" size="sm" onClick={() => setVer(p.id)}>
