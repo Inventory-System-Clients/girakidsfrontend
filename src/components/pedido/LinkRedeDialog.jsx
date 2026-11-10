@@ -13,6 +13,11 @@ export const PORTAL_REDE = "https://meu.userede.com.br/link-pagamento";
 export const FORMAS_LINK_REDE = ["CREDITO_LINK", "LINK_PAGAMENTO"];
 const LIMITE_REDE = 15000;
 
+// Cliente que escolhe Crédito link pede o link ao comercial pelo WhatsApp.
+export const WHATSAPP_LINK_REDE = "11942058445";
+export const mensagemPedirLinkRede = (pedido) =>
+  `Olá! Fiz meu pedido via site e escolhi pagamento via link da Rede, poderia me enviar meu link de pagamento? Meu pedido é ${pedido.numeroFormatado}`;
+
 export const aceitaLinkRede = (pedido) =>
   FORMAS_LINK_REDE.includes(pedido?.formaPagamento) ||
   (pedido?.formaPagamento === "MESCLA" && (pedido.composicaoPagamento || []).some((l) => FORMAS_LINK_REDE.includes(l.metodo)));
@@ -86,7 +91,7 @@ export default function LinkRedeDialog({ pedido: inicial, onFechar, onFeito, onC
       setLink("");
       setTrocando(!novo);
       onFeito?.(d, false);
-      toast({ titulo: novo ? "Link salvo: o cliente já vê o botão de pagar" : "Link removido" });
+      toast({ titulo: novo ? "Link salvo no pedido" : "Link removido" });
     } catch (e) {
       toast({ titulo: "Não foi possível salvar o link", descricao: mensagemErro(e), tipo: "erro" });
     } finally {
@@ -163,7 +168,7 @@ export default function LinkRedeDialog({ pedido: inicial, onFechar, onFeito, onC
           <>
             <section className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
               <p className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                <CheckCircle2 className="h-4 w-4" /> Link salvo. O cliente vê o botão "Pagar com cartão" no pedido.
+                <CheckCircle2 className="h-4 w-4" /> Link salvo no pedido. Envie ao cliente abaixo.
               </p>
               <p className="break-all font-mono text-xs">{pedido.pagamentoLink}</p>
               {vence && <p className={vencido ? "text-sm font-semibold text-red-700" : "text-sm"}>{vencido ? `Venceu em ${vence}: gere um novo link.` : `Vale até ${vence}.`}</p>}
