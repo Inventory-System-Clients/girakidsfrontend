@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api, { mensagemErro } from "../../services/api";
 import { Badge, Button, Checkbox, Dialog, Field, Input, Select, Spinner, Textarea, useConfirm, useToast } from "../ui";
-import { data as dataCurta, moeda } from "../../utils/format";
+import { data as dataCurta, mascaraCnpj, moeda } from "../../utils/format";
 
 const MOD_FRETE = { 0: "CIF (por conta do remetente)", 1: "FOB (por conta do destinatário)", 9: "Sem transporte (retirada)" };
 // Dados do cliente que a tela deixa completar quando faltam no pedido.
@@ -483,7 +483,27 @@ export default function EmitirNotaDialog({ pedidoId, onFechar, onEmitida }) {
 
           <section className="grid gap-3 sm:grid-cols-3">
             <h3 className="font-semibold sm:col-span-3">Transporte</h3>
-            <p className="sm:col-span-3 text-muted-foreground">Transportadora: {nota.transporte.transportadora?.nome || "—"}</p>
+            <p className="sm:col-span-3 text-muted-foreground">
+              Transportadora: {nota.transporte.transportadora?.nome || "—"}
+              {nota.transporte.transportadora?.cnpj && !nota.transporte.semCnpjCadastrado ? ` · CNPJ ${mascaraCnpj(nota.transporte.transportadora.cnpj)}` : ""}
+            </p>
+            {nota.transporte.semCnpjCadastrado && (
+              <Field
+                label="CNPJ da transportadora"
+                obrigatorio
+                className="sm:col-span-3"
+                dica="Ela não tem CNPJ cadastrado: o CNPJ digitado vai na nota e fica salvo na transportadora."
+                erro={(opcoes.transportadoraCnpj || "").replace(/\D/g, "").length === 14 && !nota.transporte.transportadora?.cnpj ? "CNPJ inválido" : undefined}
+              >
+                <Input
+                  inputMode="numeric"
+                  placeholder="00.000.000/0000-00"
+                  value={opcoes.transportadoraCnpj ?? ""}
+                  onChange={(e) => alterar("transportadoraCnpj", mascaraCnpj(e.target.value))}
+                  className={(opcoes.transportadoraCnpj || "").replace(/\D/g, "").length !== 14 ? "border-red-300!" : ""}
+                />
+              </Field>
+            )}
             <Field label="Frete">
               <Select value={opcoes.modFrete ?? nota.transporte.modFrete} onChange={(e) => alterar("modFrete", e.target.value)}>
                 {Object.entries(MOD_FRETE).map(([v, n]) => (
