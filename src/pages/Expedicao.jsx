@@ -93,7 +93,7 @@ export default function Expedicao() {
       <div className="space-y-3 md:hidden">
         {!dados && <Skeleton className="h-40" />}
         {dados?.itens.map((p) => (
-          <Card key={p.id} className="p-4" onClick={() => abrir(p)}>
+          <Card key={p.id} className={p.statusExpedicao === "EXPEDIDO" ? "border-emerald-200! bg-emerald-50! p-4" : "p-4"} onClick={() => abrir(p)}>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-semibold">
@@ -146,7 +146,7 @@ export default function Expedicao() {
               </tr>
             )}
             {dados?.itens.map((p) => (
-              <tr key={p.id} className="cursor-pointer hover:bg-muted/40" onClick={() => abrir(p)}>
+              <tr key={p.id} className={p.statusExpedicao === "EXPEDIDO" ? "cursor-pointer bg-emerald-50 hover:bg-emerald-100/70" : "cursor-pointer hover:bg-muted/40"} onClick={() => abrir(p)}>
                 <Td>
                   <CelulaNumero pedido={p} />
                 </Td>

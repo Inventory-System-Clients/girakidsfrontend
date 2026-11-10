@@ -118,7 +118,7 @@ export default function MontagemPedido() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <div className={cx("mb-4", expedido && "rounded-xl border border-emerald-200 bg-emerald-50 p-3")}>
         <h1 className="text-2xl font-bold">Montagem · Pedido {pedido.numeroFormatado}</h1>
         <div className="mt-1 flex flex-wrap gap-2">
           <Badge variant={expedido ? "success" : concluida ? "info" : conferidos ? "warning" : "default"}>
@@ -253,8 +253,17 @@ export default function MontagemPedido() {
               </>
             )}
           </p>
-          <FotosUpload titulo="Fotos do pedido" descricao="Pedido montado/embalado." fotos={pedido.imagensExpedicao || []} onChange={salvarFotos("imagensExpedicao")} />
-          <FotosUpload titulo="Fotos da transportadora" descricao="Coleta, entrega na transportadora ou comprovante." fotos={pedido.imagensTransportadora || []} onChange={salvarFotos("imagensTransportadora")} />
+          {expedido ? (
+            <>
+              {(pedido.imagensExpedicao || []).length > 0 && <FotosUpload titulo="Fotos do pedido" fotos={pedido.imagensExpedicao} desabilitado onChange={() => {}} />}
+              {(pedido.imagensTransportadora || []).length > 0 && <FotosUpload titulo="Fotos da transportadora" fotos={pedido.imagensTransportadora} desabilitado onChange={() => {}} />}
+            </>
+          ) : (
+            <>
+              <FotosUpload titulo="Fotos do pedido" descricao="Pedido montado/embalado." fotos={pedido.imagensExpedicao || []} onChange={salvarFotos("imagensExpedicao")} />
+              <FotosUpload titulo="Fotos da transportadora" descricao="Coleta, entrega na transportadora ou comprovante." fotos={pedido.imagensTransportadora || []} onChange={salvarFotos("imagensTransportadora")} />
+            </>
+          )}
         </div>
       )}
 
