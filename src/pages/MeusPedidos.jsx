@@ -15,7 +15,7 @@ const ABAS = [
   { value: "concluidos", label: "Concluídos" },
 ];
 // Rastreio carregado sozinho só dos envios recentes (os antigos, no botão).
-const recente = (p) => p.expedidoEm && Date.now() - new Date(p.expedidoEm).getTime() < 30 * 86_400_000;
+const recente = (p) => !p.expedidoEm || Date.now() - new Date(p.expedidoEm).getTime() < 30 * 86_400_000;
 
 export default function MeusPedidos() {
   const [aba, setAba] = useState("andamento");

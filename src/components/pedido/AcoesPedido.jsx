@@ -21,6 +21,7 @@ import {
   Copy,
   Link2,
   Share2,
+  PackageSearch,
 } from "lucide-react";
 import QRCode from "qrcode";
 import api, { enviarArquivo, mensagemErro } from "../../services/api";
@@ -900,6 +901,91 @@ function NotaFiscalDialog({ pedido, onFechar, onFeito }) {
   );
 }
 
+// Etiqueta dos Correios feita por fora do site: associa o código ao pedido
+// para aparecer no acompanhamento do cliente (com o rastreio em tempo real).
+const CORREIOS = ["PAC", "SEDEX"];
+const limparCodigo = (texto) => texto.replace(/\s+/g, "").toUpperCase();
+const codigoValido = (texto) => /^[A-Z]{2}\d{9}[A-Z]{2}$/.test(texto);
+
+function RastreioDialog({ pedido, onFechar, onFeito }) {
+  const [codigo, setCodigo] = useState(pedido.codigoRastreio || "");
+  const [metodo, setMetodo] = useState(CORREIOS.includes(pedido.metodoEnvio) ? pedido.metodoEnvio : "");
+  const [salvando, setSalvando] = useState(false);
+  const toast = useToast();
+  const confirmar = useConfirm();
+  const limpo = limparCodigo(codigo);
+  const precisaMetodo = !CORREIOS.includes(pedido.metodoEnvio);
+  const erroCodigo = limpo && !codigoValido(limpo) ? "Formato dos Correios: 2 letras, 9 números e 2 letras (ex.: AB123456789BR)." : "";
+
+  const salvar = async (valor) => {
+    setSalvando(true);
+    try {
+      const { data: d } = await api.put(`/pedidos/${pedido.id}/codigo-rastreio`, { codigo: valor, metodoEnvio: precisaMetodo ? metodo : undefined });
+      toast({ titulo: valor ? "Código de rastreio associado" : "Código de rastreio removido", descricao: valor ? "O cliente já vê o rastreio no acompanhamento do pedido." : undefined });
+      onFeito(d);
+    } catch (error) {
+      toast({ titulo: "Erro", descricao: mensagemErro(error), tipo: "erro" });
+    } finally {
+      setSalvando(false);
+    }
+  };
+  const remover = async () => {
+    const ok = await confirmar({ titulo: "Remover código de rastreio?", mensagem: `O código ${pedido.codigoRastreio} deixa de aparecer no acompanhamento do cliente.`, confirmar: "Remover", perigo: true });
+    if (ok) salvar(null);
+  };
+
+  return (
+    <Dialog
+      aberto
+      onFechar={onFechar}
+      titulo={`Rastreio dos Correios · Pedido ${pedido.numeroFormatado}`}
+      rodape={
+        <>
+          {pedido.codigoRastreio && (
+            <Button variant="ghost" className="mr-auto text-red-700" onClick={remover} disabled={salvando}>
+              Remover código
+            </Button>
+          )}
+          <Button variant="outline" onClick={onFechar}>
+            Cancelar
+          </Button>
+          <Button onClick={() => salvar(limpo)} loading={salvando} disabled={!codigoValido(limpo) || (precisaMetodo && !metodo) || limpo === pedido.codigoRastreio}>
+            Salvar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Use quando a etiqueta dos Correios foi feita por fora do site. O código aparece no acompanhamento do pedido do cliente, com o rastreio em tempo real.
+        </p>
+        <Field label="Código de rastreio" erro={erroCodigo}>
+          <Input
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+            placeholder="AB123456789BR"
+            maxLength={20}
+            autoFocus
+            className="font-mono uppercase"
+          />
+        </Field>
+        {precisaMetodo && (
+          <Field label="Enviado por">
+            <Select value={metodo} onChange={(e) => setMetodo(e.target.value)}>
+              <option value="">Escolha PAC ou SEDEX</option>
+              <option value="PAC">PAC - Correios</option>
+              <option value="SEDEX">SEDEX - Correios</option>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              O pedido está como {METODOS_ENVIO[pedido.metodoEnvio] || "entrega a definir"}{pedido.transportadoraNome ? ` (${pedido.transportadoraNome})` : ""} e passa a ser envio pelos Correios.
+            </p>
+          </Field>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
 function ExpedirDialog({ pedido, onFechar, onFeito }) {
   const [fotosPedido, setFotosPedido] = useState(pedido.imagensExpedicao || []);
   const [fotosTransportadora, setFotosTransportadora] = useState(pedido.imagensTransportadora || []);
@@ -1193,6 +1279,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
             { label: "Baixar PDF", icone: FileDown, onClick: baixarPdf },
             { label: expedido ? "Ver montagem e fotos" : "Montar pedido", icone: ListChecks, onClick: () => navigate(`/expedicao/${pedido.id}`) },
             { label: "Copiar link de acompanhamento", icone: Share2, onClick: copiarAcompanhamento },
+            ativo && { label: pedido.codigoRastreio ? "Código de rastreio (Correios)" : "Associar rastreio dos Correios", icone: PackageSearch, onClick: () => comCompleto("rastreio") },
             pedido.checklist?.conferidos > 0 && !expedido && { label: "Desfazer montagem", icone: Undo2, onClick: desfazer },
             !expedido && { label: "Expedir", icone: Truck, disabled: !pedido.checklist?.completo, onClick: () => comCompleto("expedir") },
             { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
@@ -1227,6 +1314,11 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
               onClick: () => comCompleto("maquininha"),
             },
             contexto === "vendas" && ativo && { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
+            contexto === "vendas" && ativo && pode("VENDAS", "FINANCEIRO", "COMERCIAL", "EXPEDICAO") && {
+              label: pedido.codigoRastreio ? "Código de rastreio (Correios)" : "Associar rastreio dos Correios",
+              icone: PackageSearch,
+              onClick: () => comCompleto("rastreio"),
+            },
             contexto === "vendas" && ativo && pode("VENDAS", "FINANCEIRO", "COMERCIAL") && { label: "Emitir nota fiscal (NF-e)", icone: FileText, cor: "font-semibold text-blue-700 hover:bg-blue-50", onClick: () => setDialogo({ nome: "emitirNfe", pedido }) },
             contexto === "vendas" && ativo && { label: "Nota fiscal", icone: FileText, onClick: () => comCompleto("nota") },
             contexto === "vendas" && ativo && pode("COMERCIAL", "FINANCEIRO", "VENDAS") && { label: "Custo pós-venda", icone: HandCoins, onClick: () => setDialogo({ nome: "custo", pedido }) },
@@ -1250,6 +1342,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
       {dialogo?.nome === "boletos" && <BoletosDialog {...props} />}
       {dialogo?.nome === "transportadora" && <TransportadoraDialog {...props} />}
       {dialogo?.nome === "nota" && <NotaFiscalDialog {...props} />}
+      {dialogo?.nome === "rastreio" && <RastreioDialog {...props} />}
       {dialogo?.nome === "expedir" && <ExpedirDialog {...props} />}
       {dialogo?.nome === "editar" && <EditarPedidoDialog {...props} />}
       {dialogo?.nome === "emitirNfe" && <EmitirNotaDialog pedidoId={dialogo.pedido.id} onFechar={() => setDialogo(null)} onEmitida={() => onAtualizado?.()} />}

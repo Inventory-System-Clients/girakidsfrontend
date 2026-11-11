@@ -168,6 +168,18 @@ function CodigoRastreio({ codigo }) {
 export function InfoEnvio({ pedido, urlRastreio, rastreioAutomatico = true }) {
   const metodo = METODOS_ENVIO[pedido.metodoEnvio] || "A definir";
   if (cancelado(pedido)) return null;
+  // Etiqueta dos Correios já associada (inclusive feita por fora do site):
+  // mostra o rastreio mesmo antes de a expedição finalizar o pedido.
+  if (!enviado(pedido) && CORREIOS.includes(pedido.metodoEnvio) && pedido.codigoRastreio) {
+    return (
+      <div className="space-y-2 rounded-md bg-sky-50 p-3 text-sm">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sky-900">
+          <Truck className="h-4 w-4" /> Envio pelos Correios ({metodo.replace(" - Correios", "")}). Rastreio: <CodigoRastreio codigo={pedido.codigoRastreio} />
+        </p>
+        {urlRastreio && <RastreioCorreios pedido={pedido} url={urlRastreio} automatico={rastreioAutomatico} />}
+      </div>
+    );
+  }
   if (!enviado(pedido)) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
