@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PackageOpen, Search } from "lucide-react";
+import { AlertTriangle, PackageOpen, Search } from "lucide-react";
 import api, { mensagemErro } from "../services/api";
 import { Button, Card, FiltroMulti, PageHeader, Paginacao, Skeleton, Table, Tabs, Td, Th, useToast } from "../components/ui";
 import AcoesPedido from "../components/pedido/AcoesPedido";
@@ -27,6 +27,40 @@ function MiniaturasItens({ itens }) {
       ))}
       {itens.length > 4 && <span className="text-xs text-muted-foreground">+{itens.length - 4}</span>}
     </span>
+  );
+}
+
+// Dias inteiros desde a conclusão da montagem.
+const diasDesde = (quando) => Math.floor((Date.now() - new Date(quando).getTime()) / 86_400_000);
+const DIAS_PARADO = 2;
+const estaParado = (p, dias = DIAS_PARADO) => p.montagemConcluidaEm && p.statusExpedicao !== "EXPEDIDO" && Date.now() - new Date(p.montagemConcluidaEm).getTime() > dias * 86_400_000;
+const textoParado = (quando) => {
+  const d = diasDesde(quando);
+  return `montado há ${d} ${d === 1 ? "dia" : "dias"}`;
+};
+
+// Alerta no topo: pedidos montados e não expedidos há mais de 2 dias.
+function AlertaParados({ parados, dias, onAbrir }) {
+  if (!parados?.length) return null;
+  return (
+    <div role="alert" className="mb-4 rounded-xl border-2 border-red-300 bg-red-50 p-3 text-red-900">
+      <p className="flex items-center gap-2 font-semibold">
+        <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+        {parados.length === 1 ? "1 pedido montado está parado" : `${parados.length} pedidos montados estão parados`} há mais de {dias} dias sem expedir
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {parados.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onAbrir(p)}
+            className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-left text-sm hover:bg-red-100"
+          >
+            <b>Pedido {p.numeroFormatado}</b> · {p.clienteNome} · <span className="font-medium text-red-700">{textoParado(p.montagemConcluidaEm)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -88,12 +122,17 @@ export default function Expedicao() {
           <FiltroMulti titulo="Time Expedição" opcoes={{ NAO_INICIADO: "Não iniciado", MONTAGEM: "Em montagem", EXPEDIDO: "Expedido" }} valores={expedicao} onChange={setExpedicao} />
         )}
       </div>
+      <AlertaParados parados={dados?.parados} dias={dados?.diasParado ?? DIAS_PARADO} onAbrir={abrir} />
 
       {/* Celular: cartões grandes, fáceis de tocar no estoque. */}
       <div className="space-y-3 md:hidden">
         {!dados && <Skeleton className="h-40" />}
         {dados?.itens.map((p) => (
-          <Card key={p.id} className={p.statusExpedicao === "EXPEDIDO" ? "border-emerald-200! bg-emerald-50! p-4" : "p-4"} onClick={() => abrir(p)}>
+          <Card
+            key={p.id}
+            className={p.statusExpedicao === "EXPEDIDO" ? "border-emerald-200! bg-emerald-50! p-4" : estaParado(p, dados.diasParado) ? "border-red-300! bg-red-50! p-4" : "p-4"}
+            onClick={() => abrir(p)}
+          >
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-semibold">
@@ -103,6 +142,11 @@ export default function Expedicao() {
                   {data(p.createdAt)} · {METODOS_ENVIO[p.metodoEnvio] || "Entrega a definir"}
                   {p.transportadoraNome && <span className="font-medium text-sky-700"> · {p.transportadoraNome}</span>}
                 </p>
+                {estaParado(p, dados.diasParado) && (
+                  <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-red-700">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Parado: {textoParado(p.montagemConcluidaEm)}
+                  </p>
+                )}
               </div>
               <span onClick={(e) => e.stopPropagation()}>
                 <AcoesPedido pedido={p} contexto="expedicao" onAtualizado={carregar} />
@@ -146,7 +190,17 @@ export default function Expedicao() {
               </tr>
             )}
             {dados?.itens.map((p) => (
-              <tr key={p.id} className={p.statusExpedicao === "EXPEDIDO" ? "cursor-pointer bg-emerald-50 hover:bg-emerald-100/70" : "cursor-pointer hover:bg-muted/40"} onClick={() => abrir(p)}>
+              <tr
+                key={p.id}
+                className={
+                  p.statusExpedicao === "EXPEDIDO"
+                    ? "cursor-pointer bg-emerald-50 hover:bg-emerald-100/70"
+                    : estaParado(p, dados.diasParado)
+                      ? "cursor-pointer bg-red-50 hover:bg-red-100/70"
+                      : "cursor-pointer hover:bg-muted/40"
+                }
+                onClick={() => abrir(p)}
+              >
                 <Td>
                   <CelulaNumero pedido={p} />
                 </Td>
@@ -167,6 +221,11 @@ export default function Expedicao() {
                 </Td>
                 <Td>
                   <CelulaExpedicao pedido={p} />
+                  {estaParado(p, dados.diasParado) && (
+                    <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-red-700">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Parado: {textoParado(p.montagemConcluidaEm)}
+                    </span>
+                  )}
                 </Td>
                 <Td>
                   <Button size="sm" variant={p.montagemConcluidaEm && p.statusExpedicao !== "EXPEDIDO" ? "success" : "outline"}>
