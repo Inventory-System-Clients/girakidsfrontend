@@ -32,7 +32,11 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
   const [grupos, setGrupos] = useState(() =>
     (produto?.capsulas || []).map((g) => ({ opcoes: (g.opcoes || [g]).map((o) => ({ produtoId: o.produtoId, nome: o.nome, quantidade: String(o.quantidade) })) })),
   );
+  // A mesma cápsula pode estar em itens diferentes (ex.: os dois lados da
+  // cápsula "vermelha ou branca"), só não duas vezes no mesmo item.
   const usadas = grupos.flatMap((g) => g.opcoes.map((o) => o.produtoId));
+  const doItem = (g) => g.opcoes.map((o) => o.produtoId);
+  const repetirItem = (gi) => setGrupos((l) => [...l.slice(0, gi + 1), { opcoes: l[gi].opcoes.map((o) => ({ ...o })) }, ...l.slice(gi + 1)]);
   const setOpcao = (gi, oi, mudanca) => setGrupos((l) => l.map((g, j) => (j === gi ? { opcoes: g.opcoes.map((o, k) => (k === oi ? { ...o, ...mudanca } : o)) } : g)));
   const tirarOpcao = (gi, oi) =>
     setGrupos((l) => l.map((g, j) => (j === gi ? { opcoes: g.opcoes.filter((_, k) => k !== oi) } : g)).filter((g) => g.opcoes.length));
@@ -106,7 +110,8 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
           </p>
           <p className="mb-2 text-xs text-muted-foreground">
             Cada item abaixo é obrigatório (<strong>e</strong>). Dentro de um item, as opções são alternativas (<strong>ou</strong>): ex.: Pokemon 1 pol = um item com "branca" ou "vermelha" — 2 mil
-            brancas + 3 mil vermelhas montam 5 mil.
+            brancas + 3 mil vermelhas montam 5 mil. A mesma cápsula pode estar em mais de um item: ex.: Pokemon 2 pol = item 1 "vermelha ou branca" e item 2 "branca ou
+            vermelha" (os dois lados). Só brancas no estoque → monta todo com brancas; só vermelhas → todo com vermelhas; das duas → metade de cada.
           </p>
           <div className="space-y-2">
             {grupos.map((g, gi) => (
@@ -129,8 +134,13 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
                     </div>
                   ))}
                 </div>
-                <div className="mt-2">
-                  <ProdutoBusca placeholder="+ alternativa (ou) — ex.: Cápsula 1 pol vermelha ou outro sleeve" excluir={[alvo?.id, ...usadas].filter(Boolean)} onEscolher={(p) => novaOpcao(gi, p)} />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <ProdutoBusca placeholder="+ alternativa (ou) — ex.: Cápsula 1 pol vermelha ou outro sleeve" excluir={[alvo?.id, ...doItem(g)].filter(Boolean)} onEscolher={(p) => novaOpcao(gi, p)} />
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => repetirItem(gi)} title="Cria outro item com as mesmas opções (ex.: o outro lado da cápsula)">
+                    Repetir este item
+                  </Button>
                 </div>
               </div>
             ))}
@@ -138,7 +148,7 @@ export function ConfigMontagem({ produto, onFechar, onSalvo }) {
           <div className="mt-2">
             <ProdutoBusca
               placeholder={grupos.length ? "+ outra cápsula ou sleeve obrigatório (e)..." : "Adicionar cápsula ou sleeve (ex.: Cápsula 1 pol branca)..."}
-              excluir={[alvo?.id, ...usadas].filter(Boolean)}
+              excluir={[alvo?.id].filter(Boolean)}
               onEscolher={(p) => setGrupos((l) => [...l, { opcoes: [{ produtoId: p.id, nome: p.nome, quantidade: "1" }] }])}
             />
             <p className="mt-1 text-xs text-muted-foreground">Ainda não cadastrou a cor? Use "Nova cápsula ou sleeve" na aba Cápsulas, sleeves e compras.</p>
