@@ -82,11 +82,35 @@ const baixarArquivos = (arquivos) => {
 
 // Itens do pedido + caixas sugeridas pela Calculadora de Pedidos, acima dos
 // dados de envio (não precisa voltar ao Time de Vendas para ver o pedido).
-function ItensEVolumes({ pedido, onUsar }) {
+function BotaoVolume({ v, totalVolumes, onUsar, br, cor = "blue" }) {
+  const estilos = {
+    blue: "border-blue-300 hover:bg-blue-100 text-blue-900",
+    green: "border-emerald-300 hover:bg-emerald-100 text-emerald-900",
+  };
+  return (
+    <button type="button" className={`w-full rounded-md border bg-white px-3 py-2 text-left text-sm ${estilos[cor]}`} onClick={() => onUsar(v)}>
+      <span className="font-bold">
+        {v.volumes}× {br(v.altura)} × {br(v.largura)} × {br(v.comprimento)} cm
+      </span>
+      {totalVolumes > 1 && v.pesoKg >= 0.1 ? <span> · cerca de {br(v.pesoKg)} kg cada</span> : null}
+    </button>
+  );
+}
+
+// Texto de onde veio a caixa aprendida.
+const origemAprendida = (a) => {
+  if (a.mesmoPedido) return "Caixa usada na postagem deste pedido.";
+  const quem = [a.pedidoNumero && `pedido ${a.pedidoNumero}`, a.por && `por ${a.por}`].filter(Boolean).join(", ");
+  return `Um pedido com o mesmo conteúdo${a.descricao ? ` (${a.descricao})` : ""} foi postado nesta caixa${quem ? ` (${quem})` : ""}.`;
+};
+
+function ItensEVolumes({ pedido, onUsar, onEsquecer, esquecendo }) {
   const itens = pedido.itens || [];
   const volumes = pedido.volumesSugeridos || [];
   const totalVolumes = volumes.reduce((s, v) => s + v.volumes, 0);
   const br = (n) => String(n).replace(".", ",");
+  const aprendida = pedido.caixaAprendida;
+  const calculados = pedido.volumesCalculados || [];
   return (
     <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white p-4">
@@ -117,6 +141,33 @@ function ItensEVolumes({ pedido, onUsar }) {
           </ul>
         )}
       </div>
+      {aprendida ? (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
+          <h3 className="text-lg font-bold text-emerald-900 mb-1">✅ Caixa aprendida</h3>
+          <p className="text-xs text-emerald-800 mb-3">
+            {origemAprendida(aprendida)}
+            {aprendida.vezes > 1 ? ` Confirmada em ${aprendida.vezes} postagens.` : ""} As medidas já foram preenchidas.
+          </p>
+          <div className="space-y-2">
+            {volumes.map((v, n) => (
+              <BotaoVolume key={n} v={v} totalVolumes={totalVolumes} onUsar={onUsar} br={br} cor="green" />
+            ))}
+          </div>
+          {calculados.length > 0 && (
+            <div className="mt-3 border-t border-emerald-200 pt-3">
+              <p className="text-xs text-emerald-800 mb-2">Conta da Calculadora de Pedidos (se precisar):</p>
+              <div className="space-y-2">
+                {calculados.map((v, n) => (
+                  <BotaoVolume key={n} v={v} totalVolumes={calculados.reduce((s, c) => s + c.volumes, 0)} onUsar={onUsar} br={br} />
+                ))}
+              </div>
+            </div>
+          )}
+          <button type="button" className="mt-3 text-xs font-semibold text-red-700 underline disabled:opacity-50" disabled={esquecendo} onClick={onEsquecer}>
+            {esquecendo ? "Esquecendo..." : "Esquecer esta caixa (estava errada)"}
+          </button>
+        </div>
+      ) : (
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
         <h3 className="text-lg font-bold text-blue-900 mb-1">Caixas sugeridas</h3>
         <p className="text-xs text-blue-800 mb-3">
@@ -128,17 +179,7 @@ function ItensEVolumes({ pedido, onUsar }) {
         ) : (
           <div className="space-y-2">
             {volumes.map((v, n) => (
-              <button
-                key={n}
-                type="button"
-                className="w-full rounded-md border border-blue-300 bg-white px-3 py-2 text-left text-sm hover:bg-blue-100"
-                onClick={() => onUsar(v)}
-              >
-                <span className="font-bold text-blue-900">
-                  {v.volumes}× {br(v.altura)} × {br(v.largura)} × {br(v.comprimento)} cm
-                </span>
-                {totalVolumes > 1 && v.pesoKg >= 0.1 ? <span className="text-blue-800"> · cerca de {br(v.pesoKg)} kg cada</span> : null}
-              </button>
+              <BotaoVolume key={n} v={v} totalVolumes={totalVolumes} onUsar={onUsar} br={br} />
             ))}
             {totalVolumes > 1 && (
               <p className="text-xs text-blue-800">
@@ -147,7 +188,11 @@ function ItensEVolumes({ pedido, onUsar }) {
             )}
           </div>
         )}
+        <p className="mt-3 text-xs text-blue-800">
+          Caixa errada? Digite as medidas certas: ao gravar a postagem, o sistema aprende e sugere essa caixa nos próximos pedidos com o mesmo conteúdo.
+        </p>
       </div>
+      )}
     </div>
   );
 }
@@ -177,6 +222,7 @@ export function Correios() {
   const [baixandoPdfId, setBaixandoPdfId] = useState("");
   // Nota fiscal do pedido aberto (a postagem vai com a NF).
   const [emitirNota, setEmitirNota] = useState(false);
+  const [esquecendo, setEsquecendo] = useState(false);
 
   const buscar = async (event) => {
     event?.preventDefault();
@@ -211,9 +257,12 @@ export function Correios() {
           ? (dados.pesoGramas / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 3 })
           : "",
       );
-      setAltura("");
-      setLargura("");
-      setComprimento("");
+      // Caixa aprendida (mesmo conteúdo já postado): medidas já preenchidas.
+      const aprendida = dados.caixaAprendida && dados.volumesSugeridos?.[0];
+      const br = (n) => String(n).replace(".", ",");
+      setAltura(aprendida ? br(aprendida.altura) : "");
+      setLargura(aprendida ? br(aprendida.largura) : "");
+      setComprimento(aprendida ? br(aprendida.comprimento) : "");
       setTimeout(() => {
         document.getElementById("painel-postagem")?.scrollIntoView({ behavior: "smooth" });
       }, 50);
@@ -308,6 +357,21 @@ export function Correios() {
       setError(err.response?.data?.error || "Erro ao baixar os PDFs.");
     } finally {
       setBaixandoPdfId("");
+    }
+  };
+
+  const esquecerCaixa = async () => {
+    if (!pedido?.caixaAprendida?.assinatura) return;
+    if (!window.confirm("Esquecer esta caixa? Os próximos pedidos com o mesmo conteúdo voltam a usar a conta da Calculadora de Pedidos.")) return;
+    try {
+      setEsquecendo(true);
+      await api.post("/correios/caixas-aprendidas/esquecer", { assinatura: pedido.caixaAprendida.assinatura });
+      const { data: dados } = await api.get(`/correios/pedidos/${pedido.id}`);
+      setPedido(dados);
+    } catch (err) {
+      setError(err.response?.data?.error || "Erro ao esquecer a caixa.");
+    } finally {
+      setEsquecendo(false);
     }
   };
 
@@ -513,7 +577,7 @@ export function Correios() {
                   ✅ Postagem gravada nos Correios — etiqueta {resultado.etiqueta || "-"}
                 </p>
                 <p className="text-sm text-emerald-800 mt-1">
-                  {resultado.servico?.nome} · {formatarMoeda(resultado.servico?.valor)}.{" "}
+                  {resultado.servico?.nome} · {formatarMoeda(resultado.servico?.valor)}. Caixa {altura} × {largura} × {comprimento} cm guardada para os próximos pedidos com o mesmo conteúdo.{" "}
                   {resultado.arquivos?.length
                     ? `Baixando ${resultado.arquivos.length} PDF(s): ${resultado.arquivos.map((a) => a.nome).join(", ")}.`
                     : ""}
@@ -539,7 +603,7 @@ export function Correios() {
               </div>
             )}
 
-            <ItensEVolumes pedido={pedido} onUsar={usarVolume} />
+            <ItensEVolumes pedido={pedido} onUsar={usarVolume} onEsquecer={esquecerCaixa} esquecendo={esquecendo} />
 
             <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
