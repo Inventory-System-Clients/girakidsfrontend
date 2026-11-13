@@ -26,7 +26,7 @@ import {
 import QRCode from "qrcode";
 import api, { enviarArquivo, mensagemErro } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
-import { Badge, Button, Checkbox, Dialog, Field, Input, RowMenu, Select, Textarea, useConfirm, useToast } from "../ui";
+import { Badge, Button, Checkbox, Dialog, Field, Input, RowMenu, Select, Textarea, cx, useConfirm, useToast } from "../ui";
 import PedidoDetalhes from "./PedidoDetalhes";
 import EmitirNotaDialog from "./EmitirNotaDialog";
 import SeletorTransportadora from "../checkout/SeletorTransportadora";
@@ -785,6 +785,7 @@ function MaquininhaDialog({ pedido: inicial, onFechar, onFeito }) {
 }
 
 function TransportadoraDialog({ pedido, onFechar, onFeito }) {
+  const [metodo, setMetodo] = useState(pedido.metodoEnvio || "");
   const [selecionada, setSelecionada] = useState(pedido.transportadoraId ? { id: pedido.transportadoraId, nome: pedido.transportadoraNome } : null);
   const [obs, setObs] = useState(pedido.transportadoraObs || "");
   const [cotacao, setCotacao] = useState({ numero: pedido.transportadoraCotacao || "", com: pedido.transportadoraCotacaoCom || "" });
@@ -794,12 +795,20 @@ function TransportadoraDialog({ pedido, onFechar, onFeito }) {
     setSalvando(true);
     try {
       const { data: d } = await api.put(`/pedidos/${pedido.id}/transportadora`, {
-        transportadora: selecionada,
+        metodoEnvio: metodo || undefined,
+        transportadora: metodo === "TRANSPORTADORA" ? selecionada : null,
         observacoes: obs,
         cotacao: cotacao.numero,
         cotacaoCom: cotacao.com,
       });
-      toast({ titulo: selecionada ? "Transportadora atualizada" : "Transportadora removida do pedido" });
+      toast({
+        titulo:
+          metodo !== "TRANSPORTADORA"
+            ? `Entrega alterada para ${METODOS_ENVIO[metodo] || "a definir"}`
+            : selecionada
+              ? "Transportadora atualizada"
+              : "Entrega por transportadora (a definir)",
+      });
       onFeito(d);
     } catch (error) {
       toast({ titulo: "Erro", descricao: mensagemErro(error), tipo: "erro" });
@@ -812,30 +821,53 @@ function TransportadoraDialog({ pedido, onFechar, onFeito }) {
       aberto
       onFechar={onFechar}
       tamanho="lg"
-      titulo={`${pedido.transportadoraNome ? "Alterar" : "Escolher"} transportadora · Pedido ${pedido.numeroFormatado}`}
-      descricao={`Transportadoras que atendem ${pedido.cidade ? `${pedido.cidade}/` : ""}${pedido.estado || "o endereço do cliente"}. Nº da cotação e contato são opcionais.`}
+      titulo={`Entrega / transportadora · Pedido ${pedido.numeroFormatado}`}
+      descricao="Escolha como o pedido será entregue. Para transportadora, escolha qual (nº da cotação e contato são opcionais)."
       rodape={
         <>
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button loading={salvando} onClick={salvar}>
+          <Button loading={salvando} onClick={salvar} disabled={!metodo}>
             Salvar
           </Button>
         </>
       }
     >
-      <SeletorTransportadora
-        uf={pedido.estado}
-        cidade={pedido.cidade}
-        pesoGramas={pedido.pesoTotalGramas}
-        selecionada={selecionada}
-        onSelecionar={setSelecionada}
-        observacao={obs}
-        onObservacao={setObs}
-        cotacao={cotacao}
-        onCotacao={setCotacao}
-      />
+      <div className="mb-3">
+        <p className="label">Método de entrega</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {Object.entries(METODOS_ENVIO).map(([valor, rotulo]) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setMetodo(valor)}
+              className={cx(
+                "rounded-lg border p-2.5 text-sm font-medium transition",
+                metodo === valor ? "border-primary bg-primary-soft text-primary ring-2 ring-primary/20" : "border-border bg-white hover:border-primary/40",
+              )}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+        {metodo !== pedido.metodoEnvio && Number(pedido.frete) === 0 && metodo !== "RETIRAR_LOCAL" && (
+          <p className="mt-2 text-xs text-amber-700">O valor do frete do pedido não muda aqui: se precisar cobrar frete, ajuste em Editar pedido.</p>
+        )}
+      </div>
+      {metodo === "TRANSPORTADORA" && (
+        <SeletorTransportadora
+          uf={pedido.estado}
+          cidade={pedido.cidade}
+          pesoGramas={pedido.pesoTotalGramas}
+          selecionada={selecionada}
+          onSelecionar={setSelecionada}
+          observacao={obs}
+          onObservacao={setObs}
+          cotacao={cotacao}
+          onCotacao={setCotacao}
+        />
+      )}
     </Dialog>
   );
 }
@@ -1282,7 +1314,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
             ativo && { label: pedido.codigoRastreio ? "Código de rastreio (Correios)" : "Associar rastreio dos Correios", icone: PackageSearch, onClick: () => comCompleto("rastreio") },
             pedido.checklist?.conferidos > 0 && !expedido && { label: "Desfazer montagem", icone: Undo2, onClick: desfazer },
             !expedido && { label: "Expedir", icone: Truck, disabled: !pedido.checklist?.completo, onClick: () => comCompleto("expedir") },
-            { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
+            { label: "Alterar entrega / transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
             { label: "Nota fiscal", icone: FileText, onClick: () => comCompleto("nota") },
           ]
         : [
@@ -1313,7 +1345,7 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
               cor: "font-semibold text-blue-700 hover:bg-blue-50",
               onClick: () => comCompleto("maquininha"),
             },
-            contexto === "vendas" && ativo && { label: "Alterar transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
+            contexto === "vendas" && ativo && { label: "Alterar entrega / transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
             contexto === "vendas" && ativo && pode("VENDAS", "FINANCEIRO", "COMERCIAL", "EXPEDICAO") && {
               label: pedido.codigoRastreio ? "Código de rastreio (Correios)" : "Associar rastreio dos Correios",
               icone: PackageSearch,
