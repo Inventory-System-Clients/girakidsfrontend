@@ -101,7 +101,7 @@ function BotaoVolume({ v, totalVolumes, onUsar, br, cor = "blue" }) {
 const origemAprendida = (a) => {
   if (a.mesmoPedido) return "Caixa usada na postagem deste pedido.";
   const quem = [a.pedidoNumero && `pedido ${a.pedidoNumero}`, a.por && `por ${a.por}`].filter(Boolean).join(", ");
-  return `Um pedido com o mesmo conteúdo${a.descricao ? ` (${a.descricao})` : ""} foi postado nesta caixa${quem ? ` (${quem})` : ""}.`;
+  return `Um pedido ${a.parecida ? "parecido" : "com o mesmo conteúdo"}${a.descricao ? ` (${a.descricao})` : ""} foi postado nesta caixa${quem ? ` (${quem})` : ""}.`;
 };
 
 function ItensEVolumes({ pedido, onUsar, onEsquecer, esquecendo }) {
@@ -143,7 +143,7 @@ function ItensEVolumes({ pedido, onUsar, onEsquecer, esquecendo }) {
       </div>
       {aprendida ? (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
-          <h3 className="text-lg font-bold text-emerald-900 mb-1">✅ Caixa aprendida</h3>
+          <h3 className="text-lg font-bold text-emerald-900 mb-1">✅ Caixa aprendida{aprendida.parecida ? " (pedido parecido)" : ""}</h3>
           <p className="text-xs text-emerald-800 mb-3">
             {origemAprendida(aprendida)}
             {aprendida.vezes > 1 ? ` Confirmada em ${aprendida.vezes} postagens.` : ""} As medidas já foram preenchidas.
@@ -189,7 +189,7 @@ function ItensEVolumes({ pedido, onUsar, onEsquecer, esquecendo }) {
           </div>
         )}
         <p className="mt-3 text-xs text-blue-800">
-          Caixa errada? Digite as medidas certas: ao gravar a postagem, o sistema aprende e sugere essa caixa nos próximos pedidos com o mesmo conteúdo.
+          Caixa errada? Digite as medidas certas: ao gravar a postagem, o sistema aprende e sugere essa caixa nos próximos pedidos com o mesmo conteúdo ou parecido.
         </p>
       </div>
       )}
@@ -362,7 +362,7 @@ export function Correios() {
 
   const esquecerCaixa = async () => {
     if (!pedido?.caixaAprendida?.assinatura) return;
-    if (!window.confirm("Esquecer esta caixa? Os próximos pedidos com o mesmo conteúdo voltam a usar a conta da Calculadora de Pedidos.")) return;
+    if (!window.confirm("Esquecer esta caixa? Os próximos pedidos com este conteúdo (ou parecido) voltam a usar a conta da Calculadora de Pedidos.")) return;
     try {
       setEsquecendo(true);
       await api.post("/correios/caixas-aprendidas/esquecer", { assinatura: pedido.caixaAprendida.assinatura });
@@ -577,7 +577,7 @@ export function Correios() {
                   ✅ Postagem gravada nos Correios — etiqueta {resultado.etiqueta || "-"}
                 </p>
                 <p className="text-sm text-emerald-800 mt-1">
-                  {resultado.servico?.nome} · {formatarMoeda(resultado.servico?.valor)}. Caixa {altura} × {largura} × {comprimento} cm guardada para os próximos pedidos com o mesmo conteúdo.{" "}
+                  {resultado.servico?.nome} · {formatarMoeda(resultado.servico?.valor)}. Caixa {altura} × {largura} × {comprimento} cm guardada para os próximos pedidos com o mesmo conteúdo ou parecido.{" "}
                   {resultado.arquivos?.length
                     ? `Baixando ${resultado.arquivos.length} PDF(s): ${resultado.arquivos.map((a) => a.nome).join(", ")}.`
                     : ""}
