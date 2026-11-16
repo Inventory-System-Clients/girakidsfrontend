@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, KeyRound } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { Button, Card, Field, Input } from "../components/ui";
+import { Button, Card, Dialog, Field, Input } from "../components/ui";
+import { BotaoWhatsapp, IconeWhatsapp, linkWhatsapp, useWhatsappComercial } from "../components/Whatsapp";
 
 export default function Login() {
   const { login } = useAuth();
@@ -13,6 +14,9 @@ export default function Login() {
   const [ver, setVer] = useState(false);
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [esqueceu, setEsqueceu] = useState(false);
+  const whatsapp = useWhatsappComercial();
+  const textoSenha = `Olá! Esqueci a senha de acesso ao catálogo Gira Kids${email ? ` (email: ${email})` : ""}. Podem me ajudar a alterar?`;
 
   const entrar = async (e) => {
     e.preventDefault();
@@ -45,6 +49,12 @@ export default function Login() {
               </button>
             </div>
           </Field>
+          <div className="-mt-2 text-right">
+            <button type="button" onClick={() => setEsqueceu(true)} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline">
+              <KeyRound className="h-3.5 w-3.5" />
+              Esqueceu a senha?
+            </button>
+          </div>
           {erro && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{erro}</p>}
           <Button type="submit" className="w-full" loading={enviando}>
             Entrar no Sistema
@@ -59,6 +69,28 @@ export default function Login() {
           </Link>
         </form>
       </Card>
+
+      <Dialog aberto={esqueceu} onFechar={() => setEsqueceu(false)} titulo="Esqueceu a senha?" tamanho="sm">
+        <div className="flex flex-col items-center gap-4 py-2 text-center">
+          <a
+            href={linkWhatsapp(whatsapp, textoSenha)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Falar conosco no WhatsApp"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-[#25D366] text-white shadow-md transition hover:scale-105"
+          >
+            <IconeWhatsapp className="h-9 w-9" />
+          </a>
+          <p className="text-base">Entre em contato conosco aqui que alteramos sua senha rapidinho!</p>
+          <BotaoWhatsapp
+            telefone={whatsapp}
+            texto={textoSenha}
+            className="w-full py-2.5"
+          >
+            Falar no WhatsApp
+          </BotaoWhatsapp>
+        </div>
+      </Dialog>
     </div>
   );
 }
