@@ -140,3 +140,9 @@
 }
 .bf-painel .label { color: #e5e5e5; }
 .bf-painel .text-muted-foreground { color: #a3a3a3; }
+/* Campos brancos dentro do preto: texto escuro (senão herda o branco). */
+.bf-painel .input,
+.bf-card input {
+  color: var(--color-foreground);
+}
+.bf-painel .input::placeholder { color: #9ca3af; }
