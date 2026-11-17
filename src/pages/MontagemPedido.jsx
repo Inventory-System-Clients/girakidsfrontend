@@ -97,6 +97,11 @@ export default function MontagemPedido() {
     if (ok) navigate("/expedicao");
   };
 
+  const darBaixa = async () => {
+    const ok = await executar("baixa", () => api.post(`/expedicao/${pedido.id}/expedir`, { observacoes: obs }), "Baixa feita: pedido já retirado");
+    if (ok) navigate("/expedicao");
+  };
+
   const desfazer = async () => {
     const ok = await confirmar({ titulo: "Desfazer montagem?", mensagem: "Todos os itens voltam para não conferidos e o pedido volta para 'Iniciar Montagem'.", perigo: true, confirmar: "Desfazer" });
     if (ok) executar("desfazer", () => api.post(`/expedicao/${pedido.id}/desfazer`), "Montagem desfeita");
@@ -128,6 +133,22 @@ export default function MontagemPedido() {
           <Badge variant="outline">{nomeForma(pedido.formaPagamento)}</Badge>
         </div>
       </div>
+
+      {pedido.retiradoEm && !expedido && (
+        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
+          <div>
+            <p className="flex items-center gap-2 font-semibold">
+              <PackageCheck className="h-5 w-5 text-emerald-600" /> O cliente já retirou este pedido na loja
+            </p>
+            <p className="text-sm">
+              Não é preciso separar nem montar: só dar baixa. Marcado por {pedido.retiradoPor || "-"} em {carimbo(pedido.retiradoEm)}.
+            </p>
+          </div>
+          <Button variant="success" loading={acao === "baixa"} onClick={darBaixa}>
+            <PackageCheck className="h-4 w-4" /> Dar baixa
+          </Button>
+        </div>
+      )}
 
       <Card className="mb-4 grid gap-4 p-4 sm:grid-cols-2">
         <div className="space-y-1">

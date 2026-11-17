@@ -35,9 +35,18 @@ export const CelulaMetodo = ({ pedido }) => {
   );
 };
 
+// Retirada na loja já feita pelo cliente (marcado pelo time de vendas).
+export const SeloRetirado = ({ pedido, className }) =>
+  pedido.retiradoEm && pedido.metodoEnvio === "RETIRAR_LOCAL" ? (
+    <span className={cx("inline-block rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap text-white", className)} title={`Marcado por ${pedido.retiradoPor || "-"} em ${carimbo(pedido.retiradoEm)}`}>
+      Já retirado pelo cliente
+    </span>
+  ) : null;
+
 export const CelulaEnvio = ({ pedido }) => (
   <span className="inline-flex flex-col items-center">
     {METODOS_ENVIO[pedido.metodoEnvio] || "—"}
+    <SeloRetirado pedido={pedido} className="mt-0.5" />
     {pedido.metodoEnvio === "TRANSPORTADORA" ? (
       <span className="max-w-32 truncate text-[11px] font-medium text-sky-700" title={pedido.transportadoraNome || ""}>
         {pedido.transportadoraNome || "a definir"}

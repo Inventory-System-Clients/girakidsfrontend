@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, PackageOpen, Search } from "lucide-react";
 import api, { mensagemErro } from "../services/api";
-import { Button, Card, FiltroMulti, PageHeader, Paginacao, Skeleton, Table, Tabs, Td, Th, useToast } from "../components/ui";
+import { Button, Card, FiltroMulti, PageHeader, Paginacao, Skeleton, Table, Tabs, Td, Th, useConfirm, useToast } from "../components/ui";
 import AcoesPedido from "../components/pedido/AcoesPedido";
-import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaNumero } from "../components/pedido/StatusCelulas";
+import { CelulaData, CelulaEnvio, CelulaExpedicao, CelulaNumero, SeloRetirado } from "../components/pedido/StatusCelulas";
 import { data } from "../utils/format";
 import { METODOS_ENVIO } from "../utils/status";
 
@@ -64,10 +64,14 @@ function AlertaParados({ parados, dias, onAbrir }) {
   );
 }
 
-const textoBotao = (p) => (p.statusExpedicao === "EXPEDIDO" ? "Ver montagem" : p.montagemConcluidaEm ? "Expedir" : p.checklist.conferidos ? "Continuar montagem" : "Montar pedido");
+// Cliente já retirou na loja: não separa de novo, só dá baixa.
+const soDarBaixa = (p) => Boolean(p.retiradoEm) && p.statusExpedicao !== "EXPEDIDO";
+
+const textoBotao = (p) => (p.statusExpedicao === "EXPEDIDO" ? "Ver montagem" : soDarBaixa(p) ? "Dar baixa (já retirado)" : p.montagemConcluidaEm ? "Expedir" : p.checklist.conferidos ? "Continuar montagem" : "Montar pedido");
 
 export default function Expedicao() {
   const toast = useToast();
+  const confirmar = useConfirm();
   const navigate = useNavigate();
   const [aba, setAba] = useState("INICIAR");
   const [busca, setBusca] = useState("");
@@ -96,7 +100,23 @@ export default function Expedicao() {
     return () => clearTimeout(t);
   }, [busca]);
 
-  const abrir = (p) => navigate(`/expedicao/${p.id}`);
+  const darBaixa = async (p) => {
+    const ok = await confirmar({
+      titulo: `Dar baixa no pedido ${p.numeroFormatado}?`,
+      mensagem: `O cliente já retirou este pedido na loja${p.retiradoPor ? ` (marcado por ${p.retiradoPor})` : ""}. Não é preciso separar: o pedido será marcado como expedido.`,
+      confirmar: "Dar baixa",
+    });
+    if (!ok) return;
+    try {
+      await api.post(`/expedicao/${p.id}/expedir`, {});
+      toast({ titulo: "Baixa feita", descricao: `Pedido ${p.numeroFormatado} expedido (já retirado).` });
+      carregar();
+    } catch (error) {
+      toast({ titulo: "Erro ao dar baixa", descricao: mensagemErro(error), tipo: "erro" });
+    }
+  };
+
+  const abrir = (p) => (soDarBaixa(p) ? darBaixa(p) : navigate(`/expedicao/${p.id}`));
 
   return (
     <div className="container-app py-6">
@@ -142,6 +162,7 @@ export default function Expedicao() {
                   {data(p.createdAt)} · {METODOS_ENVIO[p.metodoEnvio] || "Entrega a definir"}
                   {p.transportadoraNome && <span className="font-medium text-sky-700"> · {p.transportadoraNome}</span>}
                 </p>
+                <SeloRetirado pedido={p} className="mt-1" />
                 {estaParado(p, dados.diasParado) && (
                   <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-red-700">
                     <AlertTriangle className="h-3.5 w-3.5" /> Parado: {textoParado(p.montagemConcluidaEm)}
@@ -158,7 +179,7 @@ export default function Expedicao() {
                 {p.checklist.conferidos}/{p.checklist.total} itens
               </span>
             </div>
-            <Button className="mt-3 w-full" variant={p.montagemConcluidaEm && p.statusExpedicao !== "EXPEDIDO" ? "success" : "primary"}>
+            <Button className="mt-3 w-full" variant={(p.montagemConcluidaEm || soDarBaixa(p)) && p.statusExpedicao !== "EXPEDIDO" ? "success" : "primary"}>
               <PackageOpen className="h-4 w-4" /> {textoBotao(p)}
             </Button>
           </Card>
@@ -228,7 +249,7 @@ export default function Expedicao() {
                   )}
                 </Td>
                 <Td>
-                  <Button size="sm" variant={p.montagemConcluidaEm && p.statusExpedicao !== "EXPEDIDO" ? "success" : "outline"}>
+                  <Button size="sm" variant={(p.montagemConcluidaEm || soDarBaixa(p)) && p.statusExpedicao !== "EXPEDIDO" ? "success" : "outline"}>
                     {textoBotao(p)}
                   </Button>
                 </Td>

@@ -22,6 +22,7 @@ import {
   Link2,
   Share2,
   PackageSearch,
+  PackageCheck,
 } from "lucide-react";
 import QRCode from "qrcode";
 import api, { enviarArquivo, mensagemErro } from "../../services/api";
@@ -1045,15 +1046,19 @@ function ExpedirDialog({ pedido, onFechar, onFeito }) {
       aberto
       onFechar={onFechar}
       tamanho="lg"
-      titulo={`Expedir pedido ${pedido.numeroFormatado}`}
-      descricao="Anexe as fotos do pedido e da transportadora (câmera ou galeria, várias de cada) e as observações da expedição."
+      titulo={pedido.retiradoEm ? `Dar baixa no pedido ${pedido.numeroFormatado}` : `Expedir pedido ${pedido.numeroFormatado}`}
+      descricao={
+        pedido.retiradoEm
+          ? "O cliente já retirou este pedido na loja: não é preciso separar nem montar. As fotos são opcionais."
+          : "Anexe as fotos do pedido e da transportadora (câmera ou galeria, várias de cada) e as observações da expedição."
+      }
       rodape={
         <>
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
           <Button variant="success" loading={enviando} onClick={confirmar}>
-            Confirmar Expedição
+            {pedido.retiradoEm ? "Confirmar baixa" : "Confirmar Expedição"}
           </Button>
         </>
       }
@@ -1283,6 +1288,28 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
     }
   };
 
+  // Retirada na loja: cliente já levou o pedido (sem WhatsApp de "pronto" e a
+  // expedição só dá baixa).
+  const marcarRetirado = async (retirado) => {
+    const ok = await confirmar(
+      retirado
+        ? {
+            titulo: `Pedido ${pedido.numeroFormatado} já foi retirado?`,
+            mensagem: "O cliente não vai receber a mensagem de \"pronto para retirada\" no WhatsApp, e o time de expedição verá que o pedido já foi retirado, podendo dar baixa direto, sem separar.",
+            confirmar: "Marcar como retirado",
+          }
+        : { titulo: "Desfazer retirada?", mensagem: "O pedido volta a aguardar retirada na loja.", confirmar: "Desfazer" },
+    );
+    if (!ok) return;
+    try {
+      const { data: d } = await api.post(`/pedidos/${pedido.id}/retirado`, { retirado });
+      toast({ titulo: retirado ? "Pedido marcado como retirado" : "Retirada desfeita" });
+      feito(d);
+    } catch (error) {
+      toast({ titulo: "Erro ao marcar retirada", descricao: mensagemErro(error), tipo: "erro" });
+    }
+  };
+
   const desfazer = async () => {
     const ok = await confirmar({ titulo: "Desfazer montagem?", mensagem: "Todos os itens voltam para não conferidos e o pedido volta para 'Iniciar Montagem'.", perigo: true, confirmar: "Desfazer" });
     if (!ok) return;
@@ -1313,7 +1340,8 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
             { label: "Copiar link de acompanhamento", icone: Share2, onClick: copiarAcompanhamento },
             ativo && { label: pedido.codigoRastreio ? "Código de rastreio (Correios)" : "Associar rastreio dos Correios", icone: PackageSearch, onClick: () => comCompleto("rastreio") },
             pedido.checklist?.conferidos > 0 && !expedido && { label: "Desfazer montagem", icone: Undo2, onClick: desfazer },
-            !expedido && { label: "Expedir", icone: Truck, disabled: !pedido.checklist?.completo, onClick: () => comCompleto("expedir") },
+            !expedido && pedido.retiradoEm && { label: "Dar baixa (já retirado)", icone: PackageCheck, cor: "font-semibold text-emerald-700 hover:bg-emerald-50", onClick: () => comCompleto("expedir") },
+            !expedido && !pedido.retiradoEm && { label: "Expedir", icone: Truck, disabled: !pedido.checklist?.completo, onClick: () => comCompleto("expedir") },
             { label: "Alterar entrega / transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
             { label: "Nota fiscal", icone: FileText, onClick: () => comCompleto("nota") },
           ]
@@ -1345,6 +1373,10 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
               cor: "font-semibold text-blue-700 hover:bg-blue-50",
               onClick: () => comCompleto("maquininha"),
             },
+            contexto === "vendas" && ativo && !expedido && pedido.tipo === "PEDIDO" && pedido.metodoEnvio === "RETIRAR_LOCAL" && pode("VENDAS", "FINANCEIRO", "COMERCIAL") &&
+              (pedido.retiradoEm
+                ? { label: "Desfazer \"já retirado\"", icone: Undo2, onClick: () => marcarRetirado(false) }
+                : { label: "Marcar como já retirado", icone: PackageCheck, cor: "font-semibold text-emerald-700 hover:bg-emerald-50", onClick: () => marcarRetirado(true) }),
             contexto === "vendas" && ativo && { label: "Alterar entrega / transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
             contexto === "vendas" && ativo && pode("VENDAS", "FINANCEIRO", "COMERCIAL", "EXPEDICAO") && {
               label: pedido.codigoRastreio ? "Código de rastreio (Correios)" : "Associar rastreio dos Correios",
