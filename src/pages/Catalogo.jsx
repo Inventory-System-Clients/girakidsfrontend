@@ -11,6 +11,8 @@ import { Badge, Button, Card, Dialog, Input, Skeleton, cx, useToast } from "../c
 import { moeda, moedaUnitaria } from "../utils/format";
 
 const POR_PAGINA = 12;
+// Categoria especial (o backend lista só os itens com Black Friday ativa).
+const CATEGORIA_BLACK_FRIDAY = "Black Friday";
 
 // Sem estoque, a imagem "fora de estoque" (quando houver) vem primeiro.
 // Esgotado sem arte própria de esgotado (ou com a mesma do estoque): foto em
@@ -386,6 +388,18 @@ export default function Catalogo() {
               <Settings2 className="h-4 w-4 text-primary" /> Categorias
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+              {(dados?.totalBlackFriday > 0 || categoria === CATEGORIA_BLACK_FRIDAY) && (
+                <button
+                  onClick={() => escolherCategoria(CATEGORIA_BLACK_FRIDAY)}
+                  className={cx(
+                    "bf-card flex shrink-0 items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold transition",
+                    categoria === CATEGORIA_BLACK_FRIDAY && "ring-2 ring-amber-300/80",
+                  )}
+                >
+                  <span className="bf-ouro-texto truncate tracking-wide uppercase">Black Friday</span>
+                  <span className="bf-ouro-fundo rounded-full px-2 text-xs">{dados?.totalBlackFriday ?? ""}</span>
+                </button>
+              )}
               {[{ nome: "", rotulo: "Todos", total: dados?.totalGeral }, ...(dados?.categorias || []).map((c) => ({ ...c, rotulo: c.nome }))].map((c) => (
                 <button
                   key={c.rotulo}
