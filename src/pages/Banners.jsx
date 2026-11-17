@@ -111,7 +111,9 @@ function BannerForm({ banner, categorias, onFechar, onSalvo }) {
             <Field label="Categoria">
               <Select value={b.categoria || ""} onChange={set("categoria")}>
                 <option value="">Selecione</option>
-                {categorias.map((c) => (
+                {/* Categoria especial do catálogo: itens com Black Friday. */}
+                <option value="Black Friday">★ Black Friday (itens em promoção para catálogo)</option>
+                {categorias.filter((c) => c.nome !== "Black Friday").map((c) => (
                   <option key={c.id} value={c.nome}>
                     {c.nome}
                   </option>
