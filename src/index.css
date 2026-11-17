@@ -97,3 +97,46 @@
     display: none !important;
   }
 }
+
+/* Black Friday: preto com dourado (cartão do catálogo e cadastro). */
+.bf-ouro-texto {
+  background: linear-gradient(100deg, #b8862b 0%, #f2d27a 30%, #fff4cc 50%, #e4b450 70%, #a8781e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.bf-ouro-fundo {
+  background: linear-gradient(100deg, #a8781e 0%, #e8c46a 35%, #fff1bd 50%, #dfb04a 65%, #9a6e18 100%);
+  color: #1c1405;
+}
+.bf-card {
+  background: radial-gradient(120% 70% at 50% 0%, #2b2417 0%, #121110 55%, #0a0a0a 100%);
+  border: 1px solid rgb(228 180 80 / 0.35);
+  box-shadow: 0 12px 30px -14px rgb(228 180 80 / 0.35);
+  color: #fafafa;
+}
+.bf-card:hover {
+  border-color: rgb(228 180 80 / 0.7);
+  box-shadow: 0 18px 40px -14px rgb(228 180 80 / 0.5);
+}
+.bf-card .text-emerald-700 { color: #86efac; }
+.bf-card .text-amber-700 { color: #fcd34d; }
+.bf-brilho { position: relative; overflow: hidden; }
+.bf-brilho::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.6) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: bf-brilho 3.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes bf-brilho {
+  0%, 65% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bf-brilho::after { display: none; }
+}
+.bf-painel .label { color: #e5e5e5; }
+.bf-painel .text-muted-foreground { color: #a3a3a3; }

@@ -31,6 +31,8 @@ import {
 import { comprimirImagem, dataHora, exportarCsv, lerNumero, moeda, moedaUnitaria, numero, percentual } from "../utils/format";
 import { TIPOS_EMBALAGEM } from "../utils/status";
 
+const virgula = (valor) => (valor != null ? String(valor).replace(".", ",") : "");
+
 const STATUS = { EM_ESTOQUE: "Em estoque", ESTOQUE_BAIXO: "Estoque baixo", SEM_ESTOQUE: "Sem estoque" };
 const corStatus = { EM_ESTOQUE: "success", ESTOQUE_BAIXO: "warning", SEM_ESTOQUE: "danger" };
 
@@ -194,10 +196,10 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
   useEffect(() => {
     api.get("/parceiros", { params: { ativos: "true" } }).then(({ data }) => setFornecedores(data));
     if (novo) {
-      setP({ tipo: "SIMPLES", modoVenda: "PADRAO", precoVenda: "", custo: "", unidadesPacote: 1, pesoPacoteGramas: "", estoque: 0, estoqueMinimo: "", tipoEmbalagem: "", componentes: [], destaque: false, imagens: [] });
+      setP({ tipo: "SIMPLES", modoVenda: "PADRAO", precoVenda: "", custo: "", unidadesPacote: 1, pesoPacoteGramas: "", estoque: 0, estoqueMinimo: "", tipoEmbalagem: "", componentes: [], destaque: false, imagens: [], blackFriday: false, precoBlackFriday: "", precoOriginalBlackFriday: "" });
     } else {
       api.get(`/produtos/${produtoId}`).then(({ data }) =>
-        setP({ ...data, imagens: data.imagens?.length ? data.imagens : data.imagemUrl ? [data.imagemUrl] : [], precoVenda: String(data.precoVenda).replace(".", ","), custo: data.custo != null ? String(data.custo).replace(".", ",") : "", estoqueMinimo: data.estoqueMinimo ?? "", tipoEmbalagem: data.tipoEmbalagem || "" }),
+        setP({ ...data, imagens: data.imagens?.length ? data.imagens : data.imagemUrl ? [data.imagemUrl] : [], precoVenda: String(data.precoVenda).replace(".", ","), custo: data.custo != null ? String(data.custo).replace(".", ",") : "", estoqueMinimo: data.estoqueMinimo ?? "", tipoEmbalagem: data.tipoEmbalagem || "", precoBlackFriday: virgula(data.precoBlackFriday), precoOriginalBlackFriday: virgula(data.precoOriginalBlackFriday) }),
       );
     }
   }, [produtoId, novo]);
@@ -220,11 +222,15 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
   const custo = p.custo === "" ? null : lerNumero(p.custo);
   const margem = custo != null ? venda - custo : null;
   const unidades = Number(p.unidadesPacote) || 1;
+  const bfPromocional = p.precoBlackFriday === "" ? null : lerNumero(p.precoBlackFriday);
+  const bfOriginal = p.precoOriginalBlackFriday === "" ? null : lerNumero(p.precoOriginalBlackFriday);
+  const bfRiscado = bfOriginal || venda;
+  const bfDesconto = bfPromocional > 0 && bfRiscado > bfPromocional ? Math.round((1 - bfPromocional / bfRiscado) * 100) : null;
 
   const salvar = async () => {
     setSalvando(true);
     try {
-      const corpo = { ...p, precoVenda: venda, custo, componentes: p.tipo === "COMPOSTO" ? p.componentes : [] };
+      const corpo = { ...p, precoVenda: venda, custo, precoBlackFriday: bfPromocional, precoOriginalBlackFriday: bfOriginal, componentes: p.tipo === "COMPOSTO" ? p.componentes : [] };
       if (novo) await api.post("/produtos", corpo);
       else await api.put(`/produtos/${produtoId}`, corpo);
       toast({ titulo: novo ? "Produto criado" : "Produto atualizado" });
@@ -383,6 +389,44 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
                 ))}
               </Select>
             </Field>
+          </div>
+
+          <div className={cx("mt-4 rounded-xl border p-4 transition", p.blackFriday ? "bf-painel border-amber-400/40 bg-neutral-950 text-white" : "border-border")}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className={cx("font-semibold", p.blackFriday && "bf-ouro-texto")}>Modo Black Friday</p>
+                <p className={cx("text-xs", p.blackFriday ? "text-neutral-400" : "text-muted-foreground")}>
+                  Visual preto e dourado no catálogo, preço riscado e o item no topo da lista.
+                </p>
+              </div>
+              <Switch checked={p.blackFriday} onChange={set("blackFriday")} label={p.blackFriday ? "Ativo" : "Desativado"} />
+            </div>
+            {p.blackFriday && (
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <Field label="Valor inicial — riscado (R$)" dica={`Por unidade. Vazio: usa o valor de venda (${moedaUnitaria(venda)})`}>
+                  <Input value={p.precoOriginalBlackFriday} onChange={set("precoOriginalBlackFriday")} placeholder={String(venda || "0,00").replace(".", ",")} />
+                </Field>
+                <Field label="Valor com desconto (R$)" obrigatorio dica="Por unidade. É o preço cobrado no carrinho">
+                  <Input value={p.precoBlackFriday} onChange={set("precoBlackFriday")} placeholder="0,00" />
+                </Field>
+                <div className="rounded-lg border border-amber-400/30 bg-white/5 p-3 text-center">
+                  <p className="text-[11px] tracking-wider text-neutral-400 uppercase">Prévia no catálogo</p>
+                  {bfPromocional > 0 ? (
+                    <>
+                      <p className="text-sm text-neutral-400 line-through">{moedaUnitaria(bfRiscado)}</p>
+                      <p className="bf-ouro-texto text-xl font-extrabold">{moedaUnitaria(bfPromocional)}</p>
+                      {bfDesconto ? (
+                        <p className="text-xs font-semibold text-amber-300">{bfDesconto}% OFF</p>
+                      ) : (
+                        <p className="text-xs text-red-300">O valor riscado precisa ser maior</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="mt-2 text-xs text-neutral-400">Informe o valor com desconto</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -744,6 +788,7 @@ function GerenciarProdutos({ categorias }) {
                   <span>
                     {p.nome}
                     {p.destaque && <Badge variant="success" className="ml-1">Mais vendido</Badge>}
+                    {p.blackFriday && <span className="ml-1 inline-flex rounded-full bg-neutral-950 px-2 py-0.5 text-[11px] font-bold text-amber-300">Black Friday</span>}
                   </span>
                 </span>
               </Td>
@@ -752,7 +797,16 @@ function GerenciarProdutos({ categorias }) {
                 {p.modoVenda === "ENCOMENDA" && <Badge variant="info" className="mt-1">Encomenda</Badge>}
               </Td>
               <Td className="text-xs">{p.categoria}</Td>
-              <Td>{moedaUnitaria(p.precoVenda)}</Td>
+              <Td>
+                {p.blackFriday && p.precoBlackFriday > 0 ? (
+                  <>
+                    <span className="block text-xs text-muted-foreground line-through">{moedaUnitaria(p.precoOriginalBlackFriday || p.precoVenda)}</span>
+                    <span className="font-semibold text-amber-700">{moedaUnitaria(p.precoBlackFriday)}</span>
+                  </>
+                ) : (
+                  moedaUnitaria(p.precoVenda)
+                )}
+              </Td>
               <Td>{p.custo != null ? moedaUnitaria(p.custo) : <span className="text-xs text-amber-600">Sem custo</span>}</Td>
               <Td>
                 {p.margemValor != null ? (

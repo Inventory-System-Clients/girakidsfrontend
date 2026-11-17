@@ -22,6 +22,17 @@ const imagensDoProduto = (p) => {
   return p.imagemUrl && p.imagemUrl !== imagens[0] ? [p.imagemUrl, ...imagens] : imagens;
 };
 
+// % de desconto da Black Friday (o backend só manda precoOriginal quando é maior).
+const descontoBlackFriday = (p) => (p.blackFriday && p.precoOriginal ? Math.round((1 - p.precoVenda / p.precoOriginal) * 100) : null);
+
+function SeloBlackFriday({ className }) {
+  return (
+    <span className={cx("bf-ouro-fundo bf-brilho inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-[0.2em] uppercase shadow-lg shadow-black/40", className)}>
+      Black Friday
+    </span>
+  );
+}
+
 const SEGURAR_MS = 3000;
 
 // Admin segura o "+" de um item sem estoque (ou no limite) para lançar mesmo
@@ -150,7 +161,52 @@ function Quantidade({ produto }) {
   );
 }
 
+function CardBlackFriday({ produto, onAbrir }) {
+  const desconto = descontoBlackFriday(produto);
+  return (
+    <Card className="bf-card group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-0.5" onClick={onAbrir}>
+      <div className="relative aspect-square bg-gradient-to-b from-neutral-200 to-neutral-300">
+        <Carrossel compacto imagens={imagensDoProduto(produto)} alt={produto.nome} className="absolute inset-0" pretoBranco={pretoEBranco(produto)} />
+        <SeloBlackFriday className="absolute top-2 left-2" />
+        {desconto > 0 && (
+          <span className="absolute top-2 right-2 flex h-12 w-12 flex-col items-center justify-center rounded-full border border-amber-300/70 bg-neutral-950/90 leading-none shadow-lg">
+            <span className="bf-ouro-texto text-sm font-black">-{desconto}%</span>
+            <span className="mt-0.5 text-[8px] font-semibold tracking-widest text-amber-200/80">OFF</span>
+          </span>
+        )}
+        {produto.destaque && (
+          <span className="absolute right-2 bottom-2 inline-flex items-center gap-1 rounded-full bg-neutral-950/85 px-2 py-0.5 text-[11px] font-semibold text-amber-200 shadow">
+            <Star className="h-3 w-3 fill-amber-300 text-amber-300" /> Mais vendido
+          </span>
+        )}
+        {!produto.disponivel && (
+          <span className="absolute bottom-2 left-2 rounded-full bg-slate-900/80 px-2 py-0.5 text-[11px] font-semibold text-white">Esgotado</span>
+        )}
+      </div>
+      <div className="h-px bg-gradient-to-r from-transparent via-amber-300/70 to-transparent" />
+      <div className="flex flex-1 flex-col items-center gap-1 px-3 pt-3 pb-4 text-center">
+        <p className="text-[11px] font-medium tracking-wider text-amber-200/60 uppercase">{produto.categoria}</p>
+        <p className="line-clamp-2 font-semibold text-white">{produto.nome}</p>
+        {produto.descricao && <p className="line-clamp-3 text-xs text-neutral-400">{produto.descricao}</p>}
+        <div className="mt-auto pt-3">
+          {produto.precoOriginal && <p className="text-sm text-neutral-500 line-through decoration-neutral-500/80">{moedaUnitaria(produto.precoOriginal)}</p>}
+          <p className="bf-ouro-texto text-2xl leading-tight font-extrabold">{moedaUnitaria(produto.precoVenda)}</p>
+          {produto.unidadesPacote > 1 && (
+            <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300/30 px-2 py-0.5 text-[11px] font-medium text-amber-100/80">
+              <Package className="h-3 w-3" /> {produto.unidadesPacote} un/pacote
+            </span>
+          )}
+        </div>
+        <div className="mt-3 w-full">
+          <Quantidade produto={produto} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function CardProduto({ produto, onAbrir }) {
+  if (produto.blackFriday) return <CardBlackFriday produto={produto} onAbrir={onAbrir} />;
   return (
     <Card className="group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md" onClick={onAbrir}>
       <div className="relative aspect-square bg-gradient-to-b from-slate-100 to-slate-200">
@@ -411,7 +467,20 @@ export default function Catalogo() {
             <div className="flex flex-col gap-2">
               <p className="text-xs text-muted-foreground">SKU {detalhe.sku}</p>
               <p className="text-lg font-semibold leading-tight">{detalhe.nome}</p>
-              <p className="text-2xl font-bold text-primary">{moedaUnitaria(detalhe.precoVenda)}</p>
+              {detalhe.blackFriday ? (
+                <div className="bf-card rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <SeloBlackFriday />
+                    {descontoBlackFriday(detalhe) > 0 && <span className="bf-ouro-texto text-sm font-black">{descontoBlackFriday(detalhe)}% OFF</span>}
+                  </div>
+                  {detalhe.precoOriginal && <p className="mt-3 text-sm text-neutral-500 line-through">De {moedaUnitaria(detalhe.precoOriginal)}</p>}
+                  <p className="text-sm text-neutral-300">
+                    por <span className="bf-ouro-texto text-3xl font-extrabold">{moedaUnitaria(detalhe.precoVenda)}</span>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-2xl font-bold text-primary">{moedaUnitaria(detalhe.precoVenda)}</p>
+              )}
               {detalhe.unidadesPacote > 1 && (
                 <p className="text-sm text-muted-foreground">
                   Pacote com {detalhe.unidadesPacote} un. — {moeda(detalhe.precoVenda * detalhe.unidadesPacote)} por pacote
