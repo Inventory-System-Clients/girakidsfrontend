@@ -33,6 +33,85 @@ import { TIPOS_EMBALAGEM } from "../utils/status";
 
 const virgula = (valor) => (valor != null ? String(valor).replace(".", ",") : "");
 
+const MEDIDAS_VAZIAS = { altura: "", largura: "", comprimento: "" };
+const paraTexto = (m) => (m ? { altura: virgula(m.altura), largura: virgula(m.largura), comprimento: virgula(m.comprimento) } : MEDIDAS_VAZIAS);
+const paraNumero = (m) => ({ altura: lerNumero(m.altura), largura: lerNumero(m.largura), comprimento: lerNumero(m.comprimento) });
+
+function CamposMedidas({ valor, onChange, disabled }) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {[["altura", "Altura"], ["largura", "Largura"], ["comprimento", "Compr."]].map(([lado, rotulo]) => (
+        <label key={lado} className="block">
+          <span className="mb-0.5 block text-[11px] text-muted-foreground">{rotulo} (cm)</span>
+          <Input inputMode="decimal" disabled={disabled} value={valor[lado]} onChange={(e) => onChange({ ...valor, [lado]: e.target.value })} />
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// Estado do formulário a partir do produto salvo.
+const freteDoProduto = (d) => ({
+  freteModo: d.freteCaixa ? "personalizada" : "auto",
+  freteCaixa: d.freteCaixa ? { ...paraTexto(d.freteCaixa), pacotesPorCaixa: String(d.freteCaixa.pacotesPorCaixa || "") } : { ...MEDIDAS_VAZIAS, pacotesPorCaixa: "" },
+  freteMedidas: paraTexto(d.freteMedidas),
+});
+
+// Caixa salva igual a uma da lista: mostra selecionada na lista.
+const reconhecerCaixa = (p, caixas) => {
+  if (!p || p.freteModo !== "personalizada") return p;
+  const m = paraNumero(p.freteCaixa);
+  const igual = caixas.find((c) => c.altura === m.altura && c.largura === m.largura && c.comprimento === m.comprimento);
+  return igual ? { ...p, freteModo: igual.nome } : p;
+};
+
+// Frete do produto: caixa em que ele vai (e quantos pacotes cabem) ou as
+// medidas do pacote para a calculadora escolher a caixa.
+function FreteProduto({ p, setP, caixas }) {
+  const modo = p.freteModo;
+  const caixaDaLista = caixas.find((c) => c.nome === modo);
+  const mudarModo = (novo) => {
+    const c = caixas.find((x) => x.nome === novo);
+    setP({
+      ...p,
+      freteModo: novo,
+      freteCaixa: novo === "auto" ? { ...MEDIDAS_VAZIAS, pacotesPorCaixa: "" } : { ...(c ? paraTexto(c) : p.freteCaixa), pacotesPorCaixa: p.freteCaixa.pacotesPorCaixa },
+    });
+  };
+  return (
+    <div className="mt-4 rounded-xl border border-border p-4">
+      <p className="font-semibold">Frete: caixa e medidas</p>
+      <p className="text-xs text-muted-foreground">Usado na cotação de Correios e transportadora (checkout e expedição).</p>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <div className="space-y-3">
+          <Field label="Caixa de envio" dica={modo === "auto" ? "A calculadora escolhe a caixa (pelas medidas abaixo ou pelo tipo de empacotamento)." : "Este produto vai sempre nesta caixa."}>
+            <Select value={modo} onChange={(e) => mudarModo(e.target.value)}>
+              <option value="auto">Automática (calculadora escolhe)</option>
+              {caixas.map((c) => (
+                <option key={c.nome} value={c.nome}>
+                  Caixa {c.nome} cm
+                </option>
+              ))}
+              <option value="personalizada">Outra caixa (digitar medidas)</option>
+            </Select>
+          </Field>
+          {modo !== "auto" && (
+            <>
+              <CamposMedidas valor={p.freteCaixa} disabled={Boolean(caixaDaLista)} onChange={(v) => setP({ ...p, freteCaixa: { ...p.freteCaixa, ...v } })} />
+              <Field label="Pacotes por caixa" obrigatorio dica={`Quantos pacotes${Number(p.unidadesPacote) > 1 ? ` de ${p.unidadesPacote} un.` : ""} cabem numa caixa`}>
+                <Input inputMode="numeric" value={p.freteCaixa.pacotesPorCaixa} onChange={(e) => setP({ ...p, freteCaixa: { ...p.freteCaixa, pacotesPorCaixa: e.target.value.replace(/\D/g, "") } })} />
+              </Field>
+            </>
+          )}
+        </div>
+        <Field label="Medidas de 1 pacote" dica={modo === "auto" ? "Opcional. Com as medidas, a calculadora coloca o pacote na menor caixa onde ele cabe." : "Opcional (a caixa de envio acima tem prioridade)."}>
+          <CamposMedidas valor={p.freteMedidas} onChange={(v) => setP({ ...p, freteMedidas: v })} />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
 const STATUS = { EM_ESTOQUE: "Em estoque", ESTOQUE_BAIXO: "Estoque baixo", SEM_ESTOQUE: "Sem estoque" };
 const corStatus = { EM_ESTOQUE: "success", ESTOQUE_BAIXO: "warning", SEM_ESTOQUE: "danger" };
 
@@ -188,6 +267,8 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
   const toast = useToast();
   const [p, setP] = useState(null);
   const [fornecedores, setFornecedores] = useState([]);
+  const [caixasFrete, setCaixasFrete] = useState([]);
+  const caixasRef = useRef([]);
   const [componentesBusca, setComponentesBusca] = useState("");
   const [componentesOpcoes, setComponentesOpcoes] = useState([]);
   const [salvando, setSalvando] = useState(false);
@@ -195,11 +276,19 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
 
   useEffect(() => {
     api.get("/parceiros", { params: { ativos: "true" } }).then(({ data }) => setFornecedores(data));
+    api
+      .get("/produtos/caixas-frete")
+      .then(({ data }) => {
+        caixasRef.current = data;
+        setCaixasFrete(data);
+        setP((atual) => reconhecerCaixa(atual, data));
+      })
+      .catch(() => {});
     if (novo) {
-      setP({ tipo: "SIMPLES", modoVenda: "PADRAO", precoVenda: "", custo: "", unidadesPacote: 1, pesoPacoteGramas: "", estoque: 0, estoqueMinimo: "", tipoEmbalagem: "", componentes: [], destaque: false, imagens: [], blackFriday: false, precoBlackFriday: "", precoOriginalBlackFriday: "" });
+      setP({ tipo: "SIMPLES", modoVenda: "PADRAO", precoVenda: "", custo: "", unidadesPacote: 1, pesoPacoteGramas: "", estoque: 0, estoqueMinimo: "", tipoEmbalagem: "", componentes: [], destaque: false, imagens: [], blackFriday: false, precoBlackFriday: "", precoOriginalBlackFriday: "", freteModo: "auto", freteCaixa: { ...MEDIDAS_VAZIAS, pacotesPorCaixa: "" }, freteMedidas: MEDIDAS_VAZIAS });
     } else {
       api.get(`/produtos/${produtoId}`).then(({ data }) =>
-        setP({ ...data, imagens: data.imagens?.length ? data.imagens : data.imagemUrl ? [data.imagemUrl] : [], precoVenda: String(data.precoVenda).replace(".", ","), custo: data.custo != null ? String(data.custo).replace(".", ",") : "", estoqueMinimo: data.estoqueMinimo ?? "", tipoEmbalagem: data.tipoEmbalagem || "", precoBlackFriday: virgula(data.precoBlackFriday), precoOriginalBlackFriday: virgula(data.precoOriginalBlackFriday) }),
+        setP(reconhecerCaixa({ ...data, imagens: data.imagens?.length ? data.imagens : data.imagemUrl ? [data.imagemUrl] : [], precoVenda: String(data.precoVenda).replace(".", ","), custo: data.custo != null ? String(data.custo).replace(".", ",") : "", estoqueMinimo: data.estoqueMinimo ?? "", tipoEmbalagem: data.tipoEmbalagem || "", precoBlackFriday: virgula(data.precoBlackFriday), precoOriginalBlackFriday: virgula(data.precoOriginalBlackFriday), ...freteDoProduto(data) }, caixasRef.current)),
       );
     }
   }, [produtoId, novo]);
@@ -230,7 +319,12 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
   const salvar = async () => {
     setSalvando(true);
     try {
-      const corpo = { ...p, precoVenda: venda, custo, precoBlackFriday: bfPromocional, precoOriginalBlackFriday: bfOriginal, componentes: p.tipo === "COMPOSTO" ? p.componentes : [] };
+      const { freteModo, ...resto } = p;
+      const corpo = {
+        ...resto,
+        freteCaixa: freteModo === "auto" ? null : { ...paraNumero(p.freteCaixa), pacotesPorCaixa: Number(p.freteCaixa.pacotesPorCaixa) || 0 },
+        freteMedidas: paraNumero(p.freteMedidas),
+        precoVenda: venda, custo, precoBlackFriday: bfPromocional, precoOriginalBlackFriday: bfOriginal, componentes: p.tipo === "COMPOSTO" ? p.componentes : [] };
       if (novo) await api.post("/produtos", corpo);
       else await api.put(`/produtos/${produtoId}`, corpo);
       toast({ titulo: novo ? "Produto criado" : "Produto atualizado" });
@@ -390,6 +484,7 @@ function ProdutoForm({ produtoId, categorias, onFechar, onSalvo }) {
               </Select>
             </Field>
           </div>
+          <FreteProduto p={p} setP={setP} caixas={caixasFrete} />
 
           <div className={cx("mt-4 rounded-xl border p-4 transition", p.blackFriday ? "bf-painel border-amber-400/40 bg-neutral-950 text-white" : "border-border")}>
             <div className="flex flex-wrap items-center justify-between gap-3">
