@@ -5,6 +5,8 @@ import { Footer } from "../../components/Header";
 import { AlertBox } from "../../components/comercial/UIComponents";
 import { LoadingSpinner } from "../../components/comercial/Loading";
 import api from "../../services/api";
+import { Tabs } from "../../components/ui";
+import { TransportadorasCadastradas } from "../../components/comercial/TransportadorasCadastradas";
 
 const ESTADOS = [
   { sigla: "AC", nome: "Acre" },
@@ -99,6 +101,7 @@ function CardTransportadora({ transportadora }) {
 }
 
 export function BuscaTransportadoras() {
+  const [aba, setAba] = useState("cadastradas");
   const [estadoDestino, setEstadoDestino] = useState("");
   const [cidadeDestino, setCidadeDestino] = useState("");
   const [peso, setPeso] = useState("");
@@ -155,13 +158,29 @@ export function BuscaTransportadoras() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
             <span className="text-5xl">🚚</span>
-            <span className="text-gradient">Busca de Transportadoras</span>
+            <span className="text-gradient">Transportadoras</span>
           </h1>
           <p className="text-gray-600 text-lg">
-            Encontre transportadoras que atendem a rota de São Paulo até o
-            destino desejado, usando IA para pesquisar na web.
+            {aba === "cadastradas"
+              ? "Veja e corrija os dados cadastrais das transportadoras que vão na nota fiscal."
+              : "Encontre transportadoras que atendem a rota de São Paulo até o destino desejado, usando IA para pesquisar na web."}
           </p>
         </div>
+
+        <Tabs
+          className="mb-6"
+          abas={[
+            { value: "cadastradas", label: "Cadastradas" },
+            { value: "buscar", label: "Buscar com IA" },
+          ]}
+          ativa={aba}
+          onChange={setAba}
+        />
+
+        {aba === "cadastradas" ? (
+          <TransportadorasCadastradas />
+        ) : (
+        <>
 
         {erro && (
           <div className="mb-6">
@@ -330,6 +349,8 @@ export function BuscaTransportadoras() {
               </div>
             )}
           </div>
+        )}
+        </>
         )}
       </main>
 

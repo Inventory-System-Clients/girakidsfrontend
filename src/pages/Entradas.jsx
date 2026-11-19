@@ -394,6 +394,16 @@ function ParceiroForm({ parceiro, tipo, onFechar, onSalvo }) {
             ))}
           </Select>
         </Field>
+        {transportadora && (
+          <>
+            <Field label="Inscrição estadual" dica='Só números, ou "ISENTO". Vai na nota fiscal.'>
+              <Input value={p.inscricaoEstadual || ""} onChange={set("inscricaoEstadual")} />
+            </Field>
+            <Field label="Endereço" dica="Rua, número e bairro. Vai na nota fiscal.">
+              <Input value={p.endereco || ""} onChange={set("endereco")} maxLength={200} />
+            </Field>
+          </>
+        )}
         <Field label="Status">
           <Select value={p.ativo ? "1" : "0"} onChange={(e) => setP({ ...p, ativo: e.target.value === "1" })}>
             <option value="1">{transportadora ? "Ativa" : "Ativo"}</option>
