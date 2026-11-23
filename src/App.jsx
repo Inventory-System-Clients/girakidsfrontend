@@ -9,6 +9,7 @@ import Catalogo from "./pages/Catalogo";
 import Login from "./pages/Login";
 import Registrar from "./pages/Registrar";
 import AlertasClientes from "./components/AlertasClientes";
+import AlertasSeparados from "./components/AlertasSeparados";
 import { WhatsappFlutuante } from "./components/Whatsapp";
 import Giraldo from "./components/Giraldo";
 import { useAuth } from "./contexts/AuthContext";
@@ -67,6 +68,7 @@ function Moldura() {
     <>
       <Header />
       <AlertasClientes />
+      <AlertasSeparados />
       <WhatsappFlutuante />
       <GiraldoNoSite />
     </>
