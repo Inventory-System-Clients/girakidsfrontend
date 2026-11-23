@@ -1,3 +1,4 @@
+import { lerNumero } from "../utils/format";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 // Carrinho salvo no navegador. Quantidade em pacotes; "precoUnitario" é o
@@ -88,7 +89,7 @@ export function CartProvider({ children }) {
 
   const resumo = useMemo(() => {
     const subtotal = itens.reduce((soma, i) => {
-      const preco = i.precoUnitario != null && i.precoUnitario !== "" ? Number(i.precoUnitario) : i.produto.precoVenda;
+      const preco = i.precoUnitario != null && i.precoUnitario !== "" ? lerNumero(i.precoUnitario) : i.produto.precoVenda;
       return soma + preco * (i.produto.unidadesPacote || 1) * i.quantidade;
     }, 0);
     return { subtotal, quantidade: itens.length };
