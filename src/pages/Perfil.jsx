@@ -117,6 +117,11 @@ export default function Perfil() {
       <Card className="p-5">
         <h2 className="font-semibold">Segurança</h2>
         <p className="mb-4 text-sm text-muted-foreground">Atualize sua senha de acesso</p>
+        {usuario?.role === "ADMIN" && (
+          <p className="mb-4 rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+            Senha de administrador: mínimo 10 caracteres, com letras e números. Não são aceitas sequências (123456, abcdef, qwerty), senhas comuns, o nome da loja, o seu nome ou o seu e-mail.
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-3">
           {!usuario?.trocarSenha && (
             <Field label="Senha atual">
@@ -124,7 +129,7 @@ export default function Perfil() {
             </Field>
           )}
           <Field label="Nova senha">
-            <Input type="password" value={senhas.novaSenha} onChange={(e) => setSenhas({ ...senhas, novaSenha: e.target.value })} placeholder="Mínimo 8 caracteres" />
+            <Input type="password" value={senhas.novaSenha} onChange={(e) => setSenhas({ ...senhas, novaSenha: e.target.value })} placeholder={usuario?.role === "ADMIN" ? "Mínimo 10, com letras e números" : "Mínimo 8 caracteres"} />
           </Field>
           <Field label="Confirmar nova senha">
             <Input type="password" value={senhas.confirmacao} onChange={(e) => setSenhas({ ...senhas, confirmacao: e.target.value })} />

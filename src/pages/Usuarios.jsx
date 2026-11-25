@@ -27,10 +27,16 @@ import { EditorEtiquetas, EtiquetasChips } from "../components/Etiquetas";
 import { data, lerNumero, moeda } from "../utils/format";
 import { ROLES } from "../utils/status";
 
+// 12 caracteres com letras e números (passa na regra de senha de administrador).
 const gerarSenha = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  return Array.from(crypto.getRandomValues(new Uint32Array(10)), (n) => chars[n % chars.length]).join("");
+  for (;;) {
+    const senha = Array.from(crypto.getRandomValues(new Uint32Array(12)), (n) => chars[n % chars.length]).join("");
+    if (/[a-zA-Z]/.test(senha) && /\d/.test(senha)) return senha;
+  }
 };
+
+const DICA_SENHA_ADMIN = "Administrador: mínimo 10 caracteres, com letras e números, sem sequências (123456, abcdef) nem senhas comuns.";
 
 function UsuarioForm({ usuario, onFechar, onSalvo }) {
   const { usuario: eu } = useAuth();
@@ -172,7 +178,7 @@ function UsuarioForm({ usuario, onFechar, onSalvo }) {
           </section>
         )}
         {novo ? (
-          <Field label="Senha" obrigatorio dica="Mínimo de 8 caracteres">
+          <Field label="Senha" obrigatorio dica={u.role === "ADMIN" ? DICA_SENHA_ADMIN : "Mínimo de 8 caracteres"}>
             <div className="flex gap-2">
               <Input value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Digite a senha" />
               <Button variant="outline" onClick={() => setSenha(gerarSenha())}>
@@ -184,6 +190,7 @@ function UsuarioForm({ usuario, onFechar, onSalvo }) {
           <section className="rounded-lg border border-border p-4">
             <h3 className="font-semibold">Resetar Senha</h3>
             <p className="mb-2 text-sm text-muted-foreground">Defina uma nova senha para este usuário no próximo login.</p>
+            {u.role === "ADMIN" && <p className="mb-2 text-xs text-amber-700">{DICA_SENHA_ADMIN}</p>}
             <div className="flex flex-wrap gap-2">
               <Input className="max-w-xs" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Digite a nova senha (mín. 8 caracteres)" />
               <Button variant="outline" onClick={() => setNovaSenha(gerarSenha())}>
