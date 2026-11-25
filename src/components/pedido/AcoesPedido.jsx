@@ -23,6 +23,7 @@ import {
   Share2,
   PackageSearch,
   PackageCheck,
+  Clock,
 } from "lucide-react";
 import QRCode from "qrcode";
 import api, { enviarArquivo, mensagemErro } from "../../services/api";
@@ -1310,6 +1311,28 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
     }
   };
 
+  // Reserva: pedido aguardando chegar estoque (sai da lista normal e da
+  // expedição até "Produto chegou"). Financeiro segue normal.
+  const alterarReserva = async (reserva) => {
+    const ok = await confirmar(
+      reserva
+        ? {
+            titulo: `Colocar o pedido ${pedido.numeroFormatado} em reserva?`,
+            mensagem: "Ele sai da lista de pedidos e da expedição até alguém clicar em \"Produto chegou\" na aba Em reserva. Valores, financeiro e pagamentos continuam normais.",
+            confirmar: "Colocar em reserva",
+          }
+        : { titulo: "O produto chegou?", mensagem: "O pedido volta para a lista de pedidos e aparece de novo para o time de expedição.", confirmar: "Produto chegou" },
+    );
+    if (!ok) return;
+    try {
+      const { data: d } = await api.post(`/pedidos/${pedido.id}/reserva`, { reserva });
+      toast({ titulo: reserva ? "Pedido colocado em reserva" : "Pedido voltou para a lista de pedidos" });
+      feito(d);
+    } catch (error) {
+      toast({ titulo: "Erro ao alterar reserva", descricao: mensagemErro(error), tipo: "erro" });
+    }
+  };
+
   const desfazer = async () => {
     const ok = await confirmar({ titulo: "Desfazer montagem?", mensagem: "Todos os itens voltam para não conferidos e o pedido volta para 'Iniciar Montagem'.", perigo: true, confirmar: "Desfazer" });
     if (!ok) return;
@@ -1377,6 +1400,9 @@ export default function AcoesPedido({ pedido, contexto = "vendas", onAtualizado 
               (pedido.retiradoEm
                 ? { label: "Desfazer \"já retirado\"", icone: Undo2, onClick: () => marcarRetirado(false) }
                 : { label: "Marcar como já retirado", icone: PackageCheck, cor: "font-semibold text-emerald-700 hover:bg-emerald-50", onClick: () => marcarRetirado(true) }),
+            contexto === "vendas" && pedido.tipo === "PEDIDO" && pode("VENDAS") && (pedido.reservaEm
+              ? { label: "Produto chegou (sair da reserva)", icone: PackageCheck, cor: "font-semibold text-emerald-700 hover:bg-emerald-50", onClick: () => alterarReserva(false) }
+              : ativo && !expedido && { label: "Colocar em reserva (aguardando estoque)", icone: Clock, onClick: () => alterarReserva(true) }),
             contexto === "vendas" && ativo && { label: "Alterar entrega / transportadora", icone: Truck, onClick: () => comCompleto("transportadora") },
             contexto === "vendas" && ativo && pode("VENDAS", "FINANCEIRO", "COMERCIAL", "EXPEDICAO") && {
               label: pedido.codigoRastreio ? "Código de rastreio (Correios)" : "Associar rastreio dos Correios",

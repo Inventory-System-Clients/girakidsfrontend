@@ -506,7 +506,9 @@ export function PeriodoPicker({ inicio, fim, onChange }) {
 // Abas, tabela, paginação, cabeçalho de página
 // ---------------------------------------------------------------------------
 
+// aba.onDrop: a aba recebe itens arrastados (aba.destaque realça enquanto arrasta).
 export function Tabs({ abas, ativa, onChange, className }) {
+  const [sobre, setSobre] = useState(null);
   return (
     <div className={cx("inline-flex max-w-full flex-wrap gap-1 rounded-lg border border-border bg-white p-1 shadow-sm", className)} role="tablist">
       {abas.map((aba) => (
@@ -515,9 +517,26 @@ export function Tabs({ abas, ativa, onChange, className }) {
           role="tab"
           aria-selected={ativa === aba.value}
           onClick={() => onChange(aba.value)}
+          {...(aba.onDrop
+            ? {
+                onDragOver: (e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (sobre !== aba.value) setSobre(aba.value);
+                },
+                onDragLeave: () => setSobre(null),
+                onDrop: (e) => {
+                  e.preventDefault();
+                  setSobre(null);
+                  aba.onDrop(e);
+                },
+              }
+            : {})}
           className={cx(
             "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition",
             ativa === aba.value ? "bg-primary text-white shadow-sm" : "text-foreground hover:bg-muted",
+            aba.destaque && "ring-2 ring-amber-400 ring-offset-1",
+            sobre === aba.value && "scale-105 bg-amber-100 text-amber-900 ring-amber-500",
           )}
         >
           {aba.label}
