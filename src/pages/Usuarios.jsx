@@ -39,7 +39,9 @@ const gerarSenha = () => {
 const DICA_SENHA_ADMIN = "Administrador: mínimo 10 caracteres, com letras e números, sem sequências (123456, abcdef) nem senhas comuns.";
 
 function UsuarioForm({ usuario, onFechar, onSalvo }) {
-  const { usuario: eu } = useAuth();
+  const { usuario: eu, pode } = useAuth();
+  // Crédito e outros pagamentos: só administrador ou Financeiro (o servidor também confere).
+  const podeFinanceiro = eu?.role === "ADMIN" || pode("FINANCEIRO");
   const toast = useToast();
   const confirmar = useConfirm();
   const novo = !usuario;
@@ -136,11 +138,11 @@ function UsuarioForm({ usuario, onFechar, onSalvo }) {
           </Field>
           {u.role === "CLIENTE" && (
             <>
-              <Field label="Crédito do cliente" dica="Saldo manual disponível para desconto em pedidos.">
-                <Input value={u.credito} onChange={(e) => setU({ ...u, credito: e.target.value })} />
+              <Field label="Crédito do cliente" dica={podeFinanceiro ? "Saldo manual disponível para desconto em pedidos." : "Só administrador ou Financeiro altera o crédito."}>
+                <Input value={u.credito} disabled={!podeFinanceiro} onChange={(e) => setU({ ...u, credito: e.target.value })} />
               </Field>
-              <Field label="Outros pagamentos" dica="Libera boleto, dinheiro e cheque no checkout do cliente.">
-                <Switch checked={u.outrosPagamentos} onChange={(v) => setU({ ...u, outrosPagamentos: v })} label={u.outrosPagamentos ? "Habilitado" : "Desabilitado"} />
+              <Field label="Outros pagamentos" dica={podeFinanceiro ? "Libera boleto, dinheiro e cheque no checkout do cliente." : "Só administrador ou Financeiro altera."}>
+                <Switch checked={u.outrosPagamentos} disabled={!podeFinanceiro} onChange={(v) => setU({ ...u, outrosPagamentos: v })} label={u.outrosPagamentos ? "Habilitado" : "Desabilitado"} />
               </Field>
               {!novo && (
                 <Field label="Avisos no WhatsApp" dica="Pedido recebido, pronto e a caminho. O cliente também desliga respondendo SAIR no WhatsApp.">
