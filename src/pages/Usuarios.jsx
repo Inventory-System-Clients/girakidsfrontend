@@ -79,6 +79,24 @@ function UsuarioForm({ usuario, onFechar, onSalvo }) {
     }
   };
 
+  // Admin: zera o 2FA de quem perdeu o celular (configura de novo no login).
+  const resetarMfa = async () => {
+    const ok = await confirmar({
+      titulo: `Resetar a verificação em duas etapas de ${usuario.nome}?`,
+      mensagem: "As sessões abertas dessa pessoa caem. Se for administrador, vai precisar configurar o app de novo no próximo login. Confirme a identidade da pessoa antes (ex.: por telefone).",
+      perigo: true,
+      confirmar: "Resetar 2FA",
+    });
+    if (!ok) return;
+    try {
+      await api.post(`/usuarios/${usuario.id}/mfa/resetar`);
+      setU((atual) => ({ ...atual, mfaAtivo: false }));
+      toast({ titulo: "Verificação em duas etapas resetada" });
+    } catch (error) {
+      toast({ titulo: "Erro", descricao: mensagemErro(error), tipo: "erro" });
+    }
+  };
+
   const excluir = async () => {
     const ok = await confirmar({ titulo: `Excluir ${usuario.nome}?`, mensagem: "Usuários com pedidos são apenas desativados, mantendo o histórico.", perigo: true, confirmar: "Excluir usuário" });
     if (!ok) return;
@@ -202,6 +220,14 @@ function UsuarioForm({ usuario, onFechar, onSalvo }) {
                 <KeyRound className="h-4 w-4" /> Resetar Senha
               </Button>
             </div>
+            {eu?.role === "ADMIN" && u.mfaAtivo && usuario.id !== eu.id && (
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="mb-2 text-sm text-muted-foreground">Verificação em duas etapas: <strong className="text-emerald-700">ativa</strong>. Perdeu o celular?</p>
+                <Button variant="outline" onClick={resetarMfa}>
+                  Resetar verificação em duas etapas
+                </Button>
+              </div>
+            )}
           </section>
         )}
       </div>

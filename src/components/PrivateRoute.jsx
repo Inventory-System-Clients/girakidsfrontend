@@ -20,6 +20,11 @@ export default function PrivateRoute({ permissoes, semShowroom, children }) {
   if (usuario.trocarSenha && location.pathname !== "/perfil") {
     return <Navigate to="/perfil" state={{ trocarSenha: true }} replace />;
   }
+  // Administrador sem verificação em duas etapas: configura antes de tudo
+  // (o servidor também bloqueia).
+  if (usuario.role === "ADMIN" && !usuario.mfaAtivo && location.pathname !== "/perfil") {
+    return <Navigate to="/perfil" replace />;
+  }
   if (permissoes?.length && !pode(...permissoes)) return <Navigate to="/" replace />;
   if (semShowroom && usuario.role === "SHOWROOM" && !usuario.trocarSenha) return <Navigate to="/" replace />;
   return children;

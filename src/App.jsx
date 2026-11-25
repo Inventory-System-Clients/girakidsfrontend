@@ -64,6 +64,9 @@ function Moldura() {
   const { pathname } = useLocation();
   const { usuario } = useAuth();
   if (pathname.startsWith("/fornecedor") || usuario?.role === "FORNECEDOR") return null;
+  // Admin sem verificação em duas etapas vai para o perfil configurar (o
+  // servidor recusa as outras telas até lá).
+  if (usuario?.role === "ADMIN" && !usuario.mfaAtivo && !["/perfil", "/login"].includes(pathname)) return <Navigate to="/perfil" replace />;
   return (
     <>
       <Header />

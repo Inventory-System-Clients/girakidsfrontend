@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, KeyRound } from "lucide-react";
+import { Eye, EyeOff, KeyRound, ShieldCheck } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button, Card, Dialog, Field, Input } from "../components/ui";
 import { BotaoWhatsapp, IconeWhatsapp, linkWhatsapp, useWhatsappComercial } from "../components/Whatsapp";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginMfa } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -15,6 +15,9 @@ export default function Login() {
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [esqueceu, setEsqueceu] = useState(false);
+  // Verificação em duas etapas: desafio recebido depois da senha certa.
+  const [desafio, setDesafio] = useState(null);
+  const [codigo, setCodigo] = useState("");
   const whatsapp = useWhatsappComercial();
   const textoSenha = `Olá! Esqueci a senha de acesso ao catálogo Gira Kids${email ? ` (email: ${email})` : ""}. Podem me ajudar a alterar?`;
 
@@ -24,9 +27,39 @@ export default function Login() {
     setEnviando(true);
     const r = await login(email, senha);
     setEnviando(false);
+    if (r.mfa) {
+      setDesafio(r.desafio);
+      setCodigo("");
+      return;
+    }
     if (!r.success) return setErro(r.error);
-    if (r.usuario.role === "FORNECEDOR") return navigate("/fornecedor/portal", { replace: true });
-    navigate(r.usuario.trocarSenha ? "/perfil" : location.state?.de || "/", { replace: true });
+    seguir(r.usuario);
+  };
+
+  const seguir = (u) => {
+    if (u.role === "FORNECEDOR") return navigate("/fornecedor/portal", { replace: true });
+    const configurarMfa = u.role === "ADMIN" && !u.mfaAtivo;
+    navigate(u.trocarSenha || configurarMfa ? "/perfil" : location.state?.de || "/", { replace: true });
+  };
+
+  const confirmarCodigo = async (e) => {
+    e.preventDefault();
+    setErro("");
+    setEnviando(true);
+    const r = await loginMfa(desafio, codigo);
+    setEnviando(false);
+    if (!r.success) {
+      if (r.expirou) {
+        setDesafio(null);
+        setSenha("");
+      }
+      return setErro(r.error);
+    }
+    if (r.usouCodigoRecuperacao) {
+      // Aviso simples: gere novos códigos no perfil.
+      window.alert("Você entrou com um código de recuperação. Ele não vale mais. Se perdeu o celular, gere novos códigos em Meu Perfil.");
+    }
+    seguir(r.usuario);
   };
 
   return (
@@ -37,6 +70,41 @@ export default function Login() {
           <h1 className="mt-3 text-2xl font-bold">Acesso ao Sistema</h1>
           <p className="text-sm text-muted-foreground">Catálogo Digital de Brinquedos Gira Kids</p>
         </div>
+        {desafio ? (
+          <form onSubmit={confirmarCodigo} className="space-y-4">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <ShieldCheck className="h-10 w-10 text-primary" />
+              <p className="font-semibold">Verificação em duas etapas</p>
+              <p className="text-sm text-muted-foreground">Abra o app autenticador no celular e digite o código de 6 dígitos da Gira Kids.</p>
+            </div>
+            <Field label="Código" dica="Sem o celular? Digite um dos seus códigos de recuperação (XXXX-XXXX).">
+              <Input
+                autoFocus
+                inputMode="text"
+                autoComplete="one-time-code"
+                className="text-center text-lg tracking-widest"
+                maxLength={9}
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+                required
+              />
+            </Field>
+            {erro && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{erro}</p>}
+            <Button type="submit" className="w-full" loading={enviando} disabled={codigo.replace(/[^A-Z0-9]/g, "").length < 6}>
+              Confirmar e entrar
+            </Button>
+            <button
+              type="button"
+              className="block w-full text-center text-sm text-muted-foreground hover:underline"
+              onClick={() => {
+                setDesafio(null);
+                setErro("");
+              }}
+            >
+              Voltar
+            </button>
+          </form>
+        ) : (
         <form onSubmit={entrar} className="space-y-4">
           <Field label="Email">
             <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -68,6 +136,7 @@ export default function Login() {
             Voltar
           </Link>
         </form>
+        )}
       </Card>
 
       <Dialog aberto={esqueceu} onFechar={() => setEsqueceu(false)} titulo="Esqueceu a senha?" tamanho="sm">
