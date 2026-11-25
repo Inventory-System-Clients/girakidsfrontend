@@ -46,28 +46,12 @@ export function AuthProvider({ children }) {
   const login = async (email, senha) => {
     try {
       const { data } = await api.post("/auth/login", { email, senha });
-      // Conta com verificação em duas etapas: falta o código do app.
-      if (data.mfaNecessario) return { success: false, mfa: true, desafio: data.desafio };
       salvar(data.token, data.usuario);
       return { success: true, usuario: data.usuario };
     } catch (error) {
       return { success: false, error: mensagemErro(error, "Erro ao fazer login") };
     }
   };
-
-  // Segunda etapa do login (código do app autenticador ou de recuperação).
-  const loginMfa = async (desafio, codigo) => {
-    try {
-      const { data } = await api.post("/auth/login/mfa", { desafio, codigo });
-      salvar(data.token, data.usuario);
-      return { success: true, usuario: data.usuario, usouCodigoRecuperacao: data.usouCodigoRecuperacao };
-    } catch (error) {
-      return { success: false, error: mensagemErro(error, "Código inválido"), expirou: error.response?.status === 401 && /expirou/.test(mensagemErro(error, "")) };
-    }
-  };
-
-  // Token novo (ex.: depois de ativar o 2FA as sessões antigas caem).
-  const atualizarSessao = useCallback((token, dados) => salvar(token, dados), []);
 
   const registrar = async (dados) => {
     try {
@@ -103,7 +87,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ usuario, carregando, login, loginMfa, atualizarSessao, registrar, logout, atualizarUsuario, interno, showroom, tiraPedido, pode }}
+      value={{ usuario, carregando, login, registrar, logout, atualizarUsuario, interno, showroom, tiraPedido, pode }}
     >
       {children}
     </AuthContext.Provider>

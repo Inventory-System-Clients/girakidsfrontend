@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import api, { mensagemErro } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import SegurancaMfa from "../components/SegurancaMfa";
 import { Button, Card, Field, Input, PageHeader, Switch, useToast } from "../components/ui";
 import EnderecoCampos from "../components/EnderecoCampos";
 
@@ -62,14 +61,8 @@ export default function Perfil() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <PageHeader titulo="Meu Perfil" subtitulo="Gerencie seus dados de cadastro e segurança da conta" voltar={!trocaObrigatoria && !(usuario?.role === "ADMIN" && !usuario?.mfaAtivo)} />
+      <PageHeader titulo="Meu Perfil" subtitulo="Gerencie seus dados de cadastro e segurança da conta" voltar={!trocaObrigatoria} />
       {trocaObrigatoria && <p className="mb-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">Por segurança, defina uma nova senha para continuar usando o sistema.</p>}
-      {usuario?.role === "ADMIN" && !usuario?.mfaAtivo && (
-        <p className="mb-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-          Por segurança, administradores precisam ativar a <strong>verificação em duas etapas</strong> antes de usar o sistema. Leva 1 minuto: veja abaixo.
-        </p>
-      )}
-      {usuario?.role === "ADMIN" && !usuario?.mfaAtivo && <SegurancaMfa />}
       <Card className="mb-6 p-5">
         <div className="mb-4 flex items-start justify-between">
           <div>
@@ -121,8 +114,6 @@ export default function Perfil() {
           </div>
         </Card>
       )}
-      {/* Equipe: 2FA (admin sem 2FA já vê a seção no topo). */}
-      {["ADMIN", "FUNCIONARIO"].includes(usuario?.role) && !(usuario?.role === "ADMIN" && !usuario?.mfaAtivo) && <SegurancaMfa />}
       <Card className="p-5">
         <h2 className="font-semibold">Segurança</h2>
         <p className="mb-4 text-sm text-muted-foreground">Atualize sua senha de acesso</p>
