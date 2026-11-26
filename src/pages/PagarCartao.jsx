@@ -10,6 +10,7 @@ import { BotaoWhatsapp, useWhatsappComercial } from "../components/Whatsapp";
 // a SumUp, nunca passam pelo nosso servidor).
 const SDK_SUMUP = "https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js";
 let sdkPromessa = null;
+const RECUSADO = "O pagamento não foi aprovado pelo banco do cartão. Confira os dados, o limite disponível para o parcelamento ou tente outro cartão.";
 const carregarSdk = () => {
   if (window.SumUpCard) return Promise.resolve(window.SumUpCard);
   sdkPromessa ||= new Promise((resolve, reject) => {
@@ -59,18 +60,39 @@ export default function PagarCartao() {
     buscar();
   };
 
+  // Confere na SumUp (pelo nosso servidor). Devolve PAGO, RECUSADO,
+  // EXPIRADO ou PENDENTE.
   const conferir = useCallback(async () => {
     setConferindo(true);
     try {
       const { data } = await api.post(`${base}/consultar`);
       if (data.pago) setDados(data);
-      return data.pago;
+      return data.pago ? "PAGO" : data.situacao || "PENDENTE";
     } catch {
-      return false;
+      return "PENDENTE";
     } finally {
       setConferindo(false);
     }
   }, [base]);
+
+  // Recusado: abre um formulário novo (checkout novo) mantendo o aviso.
+  const novaTentativa = useCallback(
+    (mensagem) =>
+      api
+        .get(base)
+        .then(({ data }) => {
+          setDados(data);
+          setAviso(mensagem);
+        })
+        .catch((e) => setErro(mensagemErro(e, "Não foi possível abrir o pagamento."))),
+    [base],
+  );
+
+  const conferirManual = async () => {
+    const situacao = await conferir();
+    if (situacao === "RECUSADO" || situacao === "EXPIRADO") novaTentativa(RECUSADO);
+    else if (situacao === "PENDENTE") setAviso("Ainda não recebemos a confirmação deste pagamento. Se você não concluiu o pagamento, preencha o cartão abaixo.");
+  };
 
   // Monta o formulário da SumUp com as parcelas fixas do pedido.
   useEffect(() => {
@@ -88,18 +110,23 @@ export default function PagarCartao() {
           amount: Number(dados.total).toFixed(2),
           installments: dados.parcelas,
           showSubmitButton: true,
-          onResponse: async (tipo) => {
-            if (tipo === "success") {
-              setAviso("");
-              // A SumUp pode levar alguns segundos para fechar a transação.
-              for (let i = 0; i < 5; i += 1) {
-                if (await conferir()) return;
-                await new Promise((r) => setTimeout(r, 2000));
+          onResponse: async (tipo, corpo) => {
+            if (tipo === "sent") setAviso("");
+            if (tipo === "error") setAviso(`Não foi possível processar o cartão${corpo?.message ? ` (${corpo.message})` : ""}. Confira os dados e tente de novo.`);
+            if (tipo !== "success" && tipo !== "fail") return;
+            // "success" da SumUp só quer dizer que a tentativa foi recebida,
+            // não que foi aprovada: o resultado vem da consulta ao checkout.
+            setAviso("Conferindo o pagamento com o banco...");
+            for (let i = 0; i < 8; i += 1) {
+              const situacao = await conferir();
+              if (situacao === "PAGO") return;
+              if (situacao === "RECUSADO" || situacao === "EXPIRADO" || (tipo === "fail" && i >= 1)) {
+                novaTentativa(RECUSADO);
+                return;
               }
-              setAviso("Pagamento enviado. Estamos aguardando a confirmação do banco — você pode fechar esta página.");
-            } else if (tipo === "fail" || tipo === "error") {
-              setAviso("O pagamento não foi aprovado. Confira os dados do cartão ou tente outro cartão.");
+              await new Promise((r) => setTimeout(r, 2500));
             }
+            setAviso("O banco ainda não confirmou o pagamento. Se a compra não aparecer no seu cartão, clique em \"Conferir pagamento\" ou fale com o nosso comercial.");
           },
         });
       })
@@ -109,7 +136,7 @@ export default function PagarCartao() {
       montado.current?.unmount?.();
       montado.current = null;
     };
-  }, [dados?.checkoutId, dados?.pago, dados?.cancelado, dados?.total, dados?.parcelas, conferir]);
+  }, [dados?.checkoutId, dados?.pago, dados?.cancelado, dados?.total, dados?.parcelas, conferir, novaTentativa]);
 
   const valorParcela = dados ? Number(dados.total) / dados.parcelas : 0;
 
@@ -154,8 +181,8 @@ export default function PagarCartao() {
             <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <Lock className="h-3.5 w-3.5" /> Pagamento processado com segurança pela SumUp.
             </p>
-            <Button variant="ghost" className="mt-2 w-full" loading={conferindo} onClick={conferir}>
-              Já paguei — conferir pagamento
+            <Button variant="ghost" className="mt-2 w-full" loading={conferindo} onClick={conferirManual}>
+              Conferir pagamento
             </Button>
           </>
         )}
