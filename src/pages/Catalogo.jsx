@@ -163,12 +163,12 @@ function Quantidade({ produto }) {
   );
 }
 
-// Selo de esgotado estilo adesivo: grande, no meio da foto, inclinado para a
+// Selo de esgotado estilo adesivo: grande, no meio da foto, subindo para a
 // direita. Não bloqueia o clique no card.
 function AdesivoEsgotado() {
   return (
     <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <span className="rotate-12 rounded-md border-2 border-white/90 bg-red-600 px-4 py-1.5 text-xl font-black tracking-widest text-white uppercase shadow-lg ring-1 ring-red-800/40 sm:text-2xl">
+      <span className="-rotate-12 rounded-md border-2 border-white/90 bg-red-600 px-4 py-1.5 text-xl font-black tracking-widest text-white uppercase shadow-lg ring-1 ring-red-800/40 sm:text-2xl">
         Esgotado
       </span>
     </span>
