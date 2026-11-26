@@ -163,6 +163,18 @@ function Quantidade({ produto }) {
   );
 }
 
+// Selo de esgotado estilo adesivo: grande, no meio da foto, inclinado para a
+// direita. Não bloqueia o clique no card.
+function AdesivoEsgotado() {
+  return (
+    <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <span className="rotate-12 rounded-md border-2 border-white/90 bg-red-600 px-4 py-1.5 text-xl font-black tracking-widest text-white uppercase shadow-lg ring-1 ring-red-800/40 sm:text-2xl">
+        Esgotado
+      </span>
+    </span>
+  );
+}
+
 function CardBlackFriday({ produto, onAbrir }) {
   const desconto = descontoBlackFriday(produto);
   return (
@@ -181,9 +193,7 @@ function CardBlackFriday({ produto, onAbrir }) {
             <Star className="h-3 w-3 fill-amber-300 text-amber-300" /> Mais vendido
           </span>
         )}
-        {!produto.disponivel && (
-          <span className="absolute bottom-2 left-2 rounded-full bg-slate-900/80 px-2 py-0.5 text-[11px] font-semibold text-white">Esgotado</span>
-        )}
+        {!produto.disponivel && <AdesivoEsgotado />}
       </div>
       <div className="h-px bg-gradient-to-r from-transparent via-amber-300/70 to-transparent" />
       <div className="flex flex-1 flex-col items-center gap-1 px-3 pt-3 pb-4 text-center">
@@ -218,9 +228,7 @@ function CardProduto({ produto, onAbrir }) {
             <Star className="h-3 w-3 fill-white" /> Mais vendido
           </span>
         )}
-        {!produto.disponivel && (
-          <span className="absolute top-2 left-2 rounded-full bg-slate-900/70 px-2 py-0.5 text-[11px] font-semibold text-white">Esgotado</span>
-        )}
+        {!produto.disponivel && <AdesivoEsgotado />}
       </div>
       <div className="flex flex-1 flex-col items-center gap-1 px-3 pt-3 pb-4 text-center">
         <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{produto.categoria}</p>

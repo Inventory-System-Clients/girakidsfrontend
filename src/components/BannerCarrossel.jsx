@@ -98,7 +98,7 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
             <button
               key={b.id}
               type="button"
-              className={cx("block w-full shrink-0", !destinoDe(b) && "cursor-default")}
+              className={cx("block w-full shrink-0", destinoDe(b) ? "cursor-pointer" : "cursor-default")}
               onClick={() => destinoDe(b) && onAbrir(b)}
               aria-label={b.alt || "Destaque"}
               aria-hidden={i !== posicao}
@@ -109,16 +109,16 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
           ))}
         </div>
       ) : (
-        <button type="button" className={cx("block w-full", !destinoDe(atual) && "cursor-default")} onClick={() => destinoDe(atual) && onAbrir(atual)} aria-label={atual.alt || "Destaque"}>
+        <button type="button" className={cx("block w-full", destinoDe(atual) ? "cursor-pointer" : "cursor-default")} onClick={() => destinoDe(atual) && onAbrir(atual)} aria-label={atual.alt || "Destaque"}>
           {imagem(atual, true)}
         </button>
       )}
       {total > 1 && (
         <>
-          <button type="button" onClick={() => ir(-1)} className={cx("absolute top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white", faixa ? "left-3 sm:left-5" : "left-2")} aria-label="Destaque anterior">
+          <button type="button" onClick={() => ir(-1)} className={cx("absolute top-1/2 -translate-y-1/2 cursor-pointer rounded-full bg-white/80 p-1.5 shadow hover:bg-white", faixa ? "left-3 sm:left-5" : "left-2")} aria-label="Destaque anterior">
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <button type="button" onClick={() => ir(1)} className={cx("absolute top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white", faixa ? "right-3 sm:right-5" : "right-2")} aria-label="Próximo destaque">
+          <button type="button" onClick={() => ir(1)} className={cx("absolute top-1/2 -translate-y-1/2 cursor-pointer rounded-full bg-white/80 p-1.5 shadow hover:bg-white", faixa ? "right-3 sm:right-5" : "right-2")} aria-label="Próximo destaque">
             <ChevronRight className="h-5 w-5" />
           </button>
           <div className={cx("absolute flex gap-1.5", faixa ? "right-3 bottom-2 sm:right-8 sm:bottom-5 lg:right-12" : "right-4 bottom-4 sm:bottom-6")}>
@@ -128,7 +128,7 @@ export default function BannerCarrossel({ onAbrir, variante = "classico", vazio 
                 type="button"
                 onClick={() => setIndice(i)}
                 aria-label={`Ver destaque ${i + 1}`}
-                className={cx("h-2 rounded-full transition-all", i === posicao ? "w-6 bg-white" : "w-2 bg-white/60")}
+                className={cx("h-2 cursor-pointer rounded-full transition-all", i === posicao ? "w-6 bg-white" : "w-2 bg-white/60")}
               />
             ))}
           </div>
