@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Lock, MessageCircle, QrCode, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import api, { mensagemErro } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Badge, Button, Card, Checkbox, EmptyState, Field, Input, MetricCard, PageHeader, Skeleton, Textarea, cx, useToast } from "../components/ui";
+import { Badge, Button, Card, Checkbox, EmptyState, Field, Input, MetricCard, PageHeader, Skeleton, Tabs, Textarea, cx, useToast } from "../components/ui";
+import ListasWhatsapp from "../components/whatsapp/ListasWhatsapp";
 import { dataHora } from "../utils/format";
 
 // Avisos automáticos de pedido no WhatsApp (Evolution API).
@@ -66,6 +67,7 @@ export default function WhatsappAvisos() {
   const [qr, setQr] = useState(null);
   const [telefoneTeste, setTelefoneTeste] = useState("");
   const [ocupado, setOcupado] = useState("");
+  const [aba, setAba] = useState("avisos");
 
   const carregar = useCallback(
     () =>
@@ -166,7 +168,19 @@ export default function WhatsappAvisos() {
 
   return (
     <div className="container-app max-w-6xl space-y-5 py-6">
-      <PageHeader titulo="Avisos no WhatsApp" subtitulo="Mensagens automáticas para o cliente: pedido recebido, pronto e a caminho." />
+      <PageHeader titulo="Avisos no WhatsApp" subtitulo="Mensagens automáticas para o cliente: avisos dos pedidos e listas de novidades e promoções." />
+
+      <Tabs
+        abas={[
+          { value: "avisos", label: "Avisos de pedidos" },
+          { value: "listas", label: "Listas de clientes" },
+        ]}
+        ativa={aba}
+        onChange={setAba}
+      />
+
+      {aba === "listas" && <ListasWhatsapp conectado={conectado} />}
+      <div className={cx("space-y-5", aba === "listas" && "hidden")}>
 
       <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
         <div className="flex items-start gap-3">
@@ -378,6 +392,7 @@ export default function WhatsappAvisos() {
             Só recebe quem tem celular válido com WhatsApp no cadastro (ou no pedido). Aviso parado mais de 12h na fila não é enviado atrasado.
           </p>
         </div>
+      </div>
       </div>
     </div>
   );
