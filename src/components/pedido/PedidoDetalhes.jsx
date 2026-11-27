@@ -334,7 +334,7 @@ export default function PedidoDetalhes({ pedidoId, onFechar }) {
             <Bloco titulo="Histórico">
               {pedido.historico.map((h, i) => (
                 <p key={i} className="text-xs text-muted-foreground">
-                  {dataHora(h.em)} · {h.por} · {h.tipo === "FORMA_PAGAMENTO" ? `Forma de pagamento: ${nomeForma(h.de)} → ${nomeForma(h.para)}` : h.tipo.replaceAll("_", " ").toLowerCase()}
+                  {dataHora(h.em)} · {h.por} · {h.tipo === "FORMA_PAGAMENTO" ? `Forma de pagamento: ${nomeForma(h.de)} → ${nomeForma(h.para)}${h.valorManual ? ` · valor cobrado manual: ${moeda(h.totalNovo)}` : ""}` : h.tipo.replaceAll("_", " ").toLowerCase()}
                   {h.totalNovo != null && h.totalAnterior !== h.totalNovo ? ` (total ${moeda(h.totalAnterior)} → ${moeda(h.totalNovo)})` : ""}
                   {h.motivo ? ` — ${h.motivo}` : ""}
                 </p>

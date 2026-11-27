@@ -438,6 +438,11 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
   const [enviando, setEnviando] = useState(false);
   const [salvo, setSalvo] = useState(null);
   const [boleto, setBoleto] = useState(() => pedido.boletoConfig || boletoPadrao());
+  // Valor cobrado à mão (em vez do total calculado pelas taxas da forma).
+  const [manual, setManual] = useState(false);
+  const [valorManual, setValorManual] = useState(() => Number(pedido.total || 0).toFixed(2).replace(".", ","));
+  const usarManual = manual && forma !== "MESCLA";
+  const freteTotal = Number(pedido.frete || 0) + Number(pedido.freteAdicional || 0);
   // Taxas do cartão (para a parte no cartão da mescla).
   const [opcoesCheckout, setOpcoesCheckout] = useState(null);
   useEffect(() => {
@@ -456,6 +461,7 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
         parcelasCartao: cartao ? parcelas : null,
         composicaoPagamento: forma === "MESCLA" ? mesclaParaEnvio(mescla, opcoesCheckout) : null,
         boleto: forma === "BOLETO" ? boleto : null,
+        valorManual: usarManual ? lerNumero(valorManual) : null,
         motivo,
       });
       toast({ titulo: "Forma de pagamento alterada", descricao: `Novo total: ${moeda(d.total)}` });
@@ -478,13 +484,13 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
       onFechar={onFechar}
       tamanho="lg"
       titulo={`Alterar forma de pagamento · Pedido ${pedido.numeroFormatado}`}
-      descricao="Esta alteração não confirma o recebimento nem altera a expedição. Taxas são recalculadas pela nova forma."
+      descricao="Esta alteração não confirma o recebimento nem altera a expedição. Taxas são recalculadas pela nova forma (ou use o valor cobrado manual)."
       rodape={
         <>
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button loading={enviando} disabled={!forma} onClick={enviar}>
+          <Button loading={enviando} disabled={!forma || (usarManual && !(lerNumero(valorManual) > 0))} onClick={enviar}>
             Salvar correção
           </Button>
         </>
@@ -510,10 +516,43 @@ function FormaPagamentoDialog({ pedido, onFechar, onFeito }) {
             </Field>
           )}
         </div>
+        {forma !== "MESCLA" && (
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <Checkbox
+              checked={manual}
+              onChange={() => setManual((v) => !v)}
+              label="Definir o valor cobrado manualmente"
+              descricao={`Em vez das taxas do sistema. Sem taxas, o pedido fica em ${moeda(base)}: acima disso a diferença entra como taxa/acréscimo; abaixo, vira desconto.`}
+            />
+            {manual && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Valor cobrado (total do pedido)">
+                  <Input inputMode="decimal" value={valorManual} onChange={(e) => setValorManual(e.target.value)} placeholder="0,00" autoFocus />
+                </Field>
+                <div className="flex items-end pb-2 text-sm">
+                  {lerNumero(valorManual) > 0 &&
+                    (lerNumero(valorManual) >= base ? (
+                      <span>
+                        Acréscimo sobre o valor sem taxas: <strong>{moeda(lerNumero(valorManual) - base)}</strong>
+                      </span>
+                    ) : lerNumero(valorManual) < freteTotal ? (
+                      <span className="text-red-600">Não pode ser menor que o frete ({moeda(freteTotal)}).</span>
+                    ) : (
+                      <span>
+                        Desconto a mais: <strong>{moeda(base - lerNumero(valorManual))}</strong>
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {forma === "BOLETO" && pedido.statusFinanceiro !== "PAGO" && (
           <>
-            <p className="text-sm text-muted-foreground">Boletos do que falta receber ({moeda(base - (pedido.totalRecebido || 0))}). Os boletos em aberto do pedido são trocados por estes.</p>
-            <EditorBoletos config={boleto} onChange={setBoleto} valor={Math.max(0, base - (pedido.totalRecebido || 0))} />
+            <p className="text-sm text-muted-foreground">
+              Boletos do que falta receber ({moeda((usarManual && lerNumero(valorManual) > 0 ? lerNumero(valorManual) : base) - (pedido.totalRecebido || 0))}). Os boletos em aberto do pedido são trocados por estes.
+            </p>
+            <EditorBoletos config={boleto} onChange={setBoleto} valor={Math.max(0, (usarManual && lerNumero(valorManual) > 0 ? lerNumero(valorManual) : base) - (pedido.totalRecebido || 0))} />
           </>
         )}
         {forma === "MESCLA" && (
