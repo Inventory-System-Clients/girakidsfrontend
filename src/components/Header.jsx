@@ -147,7 +147,7 @@ export function Header() {
   const alertasRecebimentos = useAlertasRecebimentos(Boolean(usuario) && pode("RECEBIMENTOS"))?.total || 0;
 
   return (
-    <header className="no-print sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
+    <header className="no-print sticky top-0 z-40 border-b border-border bg-white">
       <div className="container-app flex h-16 items-center justify-between gap-3">
         <Link to="/" className="flex items-center" title="Gira Kids">
           <LogoAnimado className="h-12 sm:h-14" />
