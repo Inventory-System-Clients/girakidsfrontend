@@ -17,6 +17,7 @@ import { limitePacotes, useCart } from "../contexts/CartContext";
 import { Button, Popover, cx } from "./ui";
 import { moeda } from "../utils/format";
 import { useAlertasRecebimentos } from "./recebimentos/comum";
+import LogoAnimado from "./LogoAnimado";
 
 function grupos(pode, usuario, alertasRecebimentos) {
   const lista = [
@@ -148,9 +149,8 @@ export function Header() {
   return (
     <header className="no-print sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
       <div className="container-app flex h-16 items-center justify-between gap-3">
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/logo.webp" alt="" className="h-11 w-11 object-contain" />
-          <span className="text-lg font-semibold">Gira Kids</span>
+        <Link to="/" className="flex items-center" title="Gira Kids">
+          <LogoAnimado className="h-12 sm:h-14" />
         </Link>
         <div className="flex items-center gap-2">
           {usuario ? (
