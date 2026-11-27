@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Bookmark,
   CalendarClock,
   Copy,
   ImagePlus,
+  Package,
   Plus,
   RefreshCw,
   Search,
@@ -67,6 +69,20 @@ const OBJETIVOS = [
 ];
 const RODAPE =
   "_Para não receber mais nossas novidades por aqui, responda SAIR._";
+const FILTRO_GERAL = {
+  tipo: "GERAL",
+  categoria: "",
+  produtoId: null,
+  produtoNome: "",
+};
+
+// "Quem mais compra: Pelúcias" / "...: Pelúcia Unicórnio" / "Todos os produtos".
+const descreverFiltro = (f) =>
+  f?.tipo === "CATEGORIA"
+    ? `Categoria ${f.categoria}`
+    : f?.tipo === "PRODUTO"
+      ? `Produto ${f.produtoNome || ""}`.trim()
+      : "Todos os produtos";
 
 const VAZIA = {
   id: null,
@@ -156,6 +172,13 @@ export default function ListasWhatsapp({ conectado }) {
   const [achados, setAchados] = useState([]);
   const [quando, setQuando] = useState("");
   const [previaLocal, setPreviaLocal] = useState(null); // blob da mídia recém-enviada
+  const [filtro, setFiltro] = useState(FILTRO_GERAL); // critério da recomendação
+  const [categorias, setCategorias] = useState([]);
+  const [buscaProduto, setBuscaProduto] = useState("");
+  const [produtosAchados, setProdutosAchados] = useState([]);
+  const [publicos, setPublicos] = useState(null); // listas nichadas salvas
+  const [publicoAtual, setPublicoAtual] = useState(null); // lista salva usada nesta
+  const [nomePublico, setNomePublico] = useState(null); // null = campo fechado
   const arquivoRef = useRef(null);
 
   const carregarListas = useCallback(
@@ -173,9 +196,23 @@ export default function ListasWhatsapp({ conectado }) {
     [toast],
   );
 
+  const carregarPublicos = useCallback(
+    () =>
+      api
+        .get("/whatsapp/publicos")
+        .then(({ data }) => setPublicos(data))
+        .catch(() => setPublicos([])),
+    [],
+  );
+
   useEffect(() => {
     carregarListas();
-  }, [carregarListas]);
+    carregarPublicos();
+    api
+      .get("/whatsapp/campanhas/categorias")
+      .then(({ data }) => setCategorias(data))
+      .catch(() => {});
+  }, [carregarListas, carregarPublicos]);
 
   // Lista enviando: atualiza o andamento sozinha.
   const idAberta = lista?.id;
@@ -238,6 +275,12 @@ export default function ListasWhatsapp({ conectado }) {
       setSugeridos(data.clientes.map((c) => c.usuarioId));
       setPreviaLocal(null);
       setQuando("");
+      setFiltro(
+        data.filtro ? { ...FILTRO_GERAL, ...data.filtro } : FILTRO_GERAL,
+      );
+      if (data.filtro?.dias) setDias(data.filtro.dias);
+      setPublicoAtual(null);
+      setNomePublico(null);
     }
   };
 
@@ -256,6 +299,10 @@ export default function ListasWhatsapp({ conectado }) {
     setSugeridos([]);
     setPreviaLocal(null);
     setQuando("");
+    setFiltro(FILTRO_GERAL);
+    setPublicoAtual(null);
+    setNomePublico(null);
+    return true;
   };
 
   const corpo = () => ({
@@ -268,7 +315,14 @@ export default function ListasWhatsapp({ conectado }) {
       usuarioId: c.usuarioId,
       pedidos: c.pedidos,
     })),
+    filtro: filtroValido() ? { ...filtro, dias } : null,
   });
+
+  // Categoria/produto escolhido (o geral sempre vale).
+  const filtroValido = () =>
+    filtro.tipo === "GERAL" ||
+    (filtro.tipo === "CATEGORIA" && Boolean(filtro.categoria)) ||
+    (filtro.tipo === "PRODUTO" && Boolean(filtro.produtoId));
 
   // Salva e devolve a lista salva (com id).
   const salvar = async (silencioso = false) => {
@@ -291,6 +345,16 @@ export default function ListasWhatsapp({ conectado }) {
 
   // ---- clientes ----
   const recomendar = async (outra) => {
+    if (!filtroValido()) {
+      toast({
+        titulo:
+          filtro.tipo === "CATEGORIA"
+            ? "Escolha a categoria"
+            : "Escolha o produto",
+        tipo: "erro",
+      });
+      return;
+    }
     const excluir = outra
       ? [...new Set([...sugeridos, ...lista.clientes.map((c) => c.usuarioId)])]
       : [];
@@ -303,6 +367,7 @@ export default function ListasWhatsapp({ conectado }) {
             excluir,
             campanhaId: lista.id,
             semRepetirDias: semRepetir ? 7 : 0,
+            filtro,
           })
         ).data,
     );
@@ -311,7 +376,9 @@ export default function ListasWhatsapp({ conectado }) {
       toast({
         titulo: outra
           ? "Não há mais clientes diferentes neste período"
-          : "Nenhum cliente com pedidos neste período",
+          : filtro.tipo === "GERAL"
+            ? "Nenhum cliente com pedidos neste período"
+            : `Ninguém comprou ${filtro.tipo === "CATEGORIA" ? "desta categoria" : "este produto"} neste período`,
         descricao:
           "Aumente o período ou desmarque “pular quem recebeu nos últimos 7 dias”.",
         tipo: "erro",
@@ -336,8 +403,158 @@ export default function ListasWhatsapp({ conectado }) {
     ]);
     toast({
       titulo: `${data.clientes.length} clientes recomendados`,
-      descricao: `Quem mais fez pedidos (${PERIODOS.find((p) => p.dias === dias)?.label.toLowerCase() || `${dias} dias`}).`,
+      descricao: `Quem mais fez pedidos${filtro.tipo === "GERAL" ? "" : ` com ${filtro.tipo === "CATEGORIA" ? `a categoria ${filtro.categoria}` : filtro.produtoNome}`} (${PERIODOS.find((p) => p.dias === dias)?.label.toLowerCase() || `${dias} dias`}).`,
     });
+  };
+
+  const mudarTipoFiltro = (tipo) => {
+    setFiltro({ ...FILTRO_GERAL, tipo });
+    setProdutosAchados([]);
+    setBuscaProduto("");
+    setAlterada(true);
+  };
+
+  const buscarProduto = async (e) => {
+    e?.preventDefault();
+    if (buscaProduto.trim().length < 2) return;
+    const data = await executar(
+      "produto",
+      async () =>
+        (
+          await api.get("/whatsapp/campanhas/produtos", {
+            params: { q: buscaProduto.trim() },
+          })
+        ).data,
+    );
+    if (data) {
+      setProdutosAchados(data);
+      if (!data.length)
+        toast({ titulo: "Nenhum produto encontrado", tipo: "erro" });
+    }
+  };
+
+  const escolherProduto = (p) => {
+    setFiltro({
+      ...FILTRO_GERAL,
+      tipo: "PRODUTO",
+      produtoId: p.id,
+      produtoNome: p.nome,
+    });
+    setProdutosAchados([]);
+    setBuscaProduto("");
+    setAlterada(true);
+    // Ajuda a IA: o produto da recomendação vira o produto da mensagem.
+    if (!lista.produtoNome) setLista((l) => ({ ...l, produtoNome: p.nome }));
+  };
+
+  // ---- listas nichadas salvas ----
+  const salvarPublico = async (atualizar) => {
+    if (!lista.clientes.length) {
+      toast({
+        titulo: "Coloque clientes na lista antes de salvar",
+        tipo: "erro",
+      });
+      return;
+    }
+    if (!filtroValido()) {
+      toast({ titulo: "Escolha a categoria ou o produto", tipo: "erro" });
+      return;
+    }
+    const corpoPublico = {
+      nome: atualizar
+        ? publicos.find((p) => p.id === publicoAtual)?.nome
+        : nomePublico,
+      filtro: { ...filtro, dias },
+      clientes: lista.clientes.map((c) => ({
+        usuarioId: c.usuarioId,
+        pedidos: c.pedidos,
+        itens: c.itens,
+      })),
+    };
+    const data = await executar(
+      "publico",
+      async () =>
+        (atualizar
+          ? await api.put(`/whatsapp/publicos/${publicoAtual}`, corpoPublico)
+          : await api.post("/whatsapp/publicos", corpoPublico)
+        ).data,
+      atualizar ? "Lista salva atualizada" : "Lista nichada salva",
+    );
+    if (data) {
+      setPublicoAtual(data.id);
+      setNomePublico(null);
+      carregarPublicos();
+    }
+  };
+
+  // Coloca os clientes da lista salva na lista aberta (ou numa nova).
+  const usarPublico = async (p) => {
+    if (!lista && !(await nova())) return;
+    if (lista && lista.status === "CANCELADA") {
+      toast({
+        titulo: "Abra uma lista que não esteja cancelada",
+        tipo: "erro",
+      });
+      return;
+    }
+    const enviados = new Set(
+      (lista?.envios || [])
+        .filter((e) => e.status !== "FILA")
+        .map((e) => e.usuarioId),
+    );
+    const fixos = (lista?.clientes || []).filter((c) =>
+      enviados.has(c.usuarioId),
+    );
+    const ids = new Set(fixos.map((c) => c.usuarioId));
+    const clientes = [
+      ...fixos,
+      ...p.clientes.filter((c) => !ids.has(c.usuarioId)),
+    ].slice(0, Math.max(MAX, fixos.length));
+    setLista((l) => ({
+      ...(l || VAZIA),
+      nome: l?.nome || p.nome,
+      produtoNome: l?.produtoNome || p.produtoNome || "",
+      clientes,
+    }));
+    setAlterada(true);
+    setFiltro({
+      tipo: p.tipo,
+      categoria: p.categoria || "",
+      produtoId: p.produtoId,
+      produtoNome: p.produtoNome || "",
+    });
+    if (p.periodoDias) setDias(p.periodoDias);
+    setSugeridos((s) => [
+      ...new Set([...s, ...p.clientes.map((c) => c.usuarioId)]),
+    ]);
+    setPublicoAtual(p.id);
+    setNomePublico(null);
+    api.post(`/whatsapp/publicos/${p.id}/usar`).catch(() => {});
+    toast({
+      titulo: `Lista “${p.nome}” carregada`,
+      descricao: "Confira os clientes, escreva a mensagem e envie.",
+    });
+  };
+
+  const excluirPublico = async (p) => {
+    if (
+      !(await confirmar({
+        titulo: "Excluir a lista salva?",
+        mensagem: `“${p.nome}” sai das listas salvas. As listas de envio não mudam.`,
+        perigo: true,
+        confirmar: "Excluir",
+      }))
+    )
+      return;
+    const ok = await executar(
+      "publico",
+      () => api.delete(`/whatsapp/publicos/${p.id}`),
+      "Lista salva excluída",
+    );
+    if (ok) {
+      if (publicoAtual === p.id) setPublicoAtual(null);
+      carregarPublicos();
+    }
   };
 
   const buscar = async (e) => {
@@ -546,64 +763,125 @@ export default function ListasWhatsapp({ conectado }) {
 
   return (
     <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
-      <Card className="h-fit space-y-3 p-4">
-        <Button className="w-full" onClick={nova}>
-          <Plus className="h-4 w-4" /> Nova lista
-        </Button>
-        {!listas ? (
-          <Skeleton className="h-40" />
-        ) : !listas.length ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            Nenhuma lista ainda.
-          </p>
-        ) : (
-          <ul className="max-h-[640px] space-y-1.5 overflow-y-auto">
-            {listas.map((l) => {
-              const st = STATUS[l.status] || STATUS.RASCUNHO;
-              const enviadas = l.resumo?.ENVIADO || 0;
-              return (
-                <li key={l.id}>
+      <div className="h-fit space-y-5">
+        <Card className="space-y-3 p-4">
+          <Button className="w-full" onClick={nova}>
+            <Plus className="h-4 w-4" /> Nova lista
+          </Button>
+          {!listas ? (
+            <Skeleton className="h-40" />
+          ) : !listas.length ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma lista ainda.
+            </p>
+          ) : (
+            <ul className="max-h-[640px] space-y-1.5 overflow-y-auto">
+              {listas.map((l) => {
+                const st = STATUS[l.status] || STATUS.RASCUNHO;
+                const enviadas = l.resumo?.ENVIADO || 0;
+                return (
+                  <li key={l.id}>
+                    <button
+                      type="button"
+                      onClick={() => abrir(l.id)}
+                      className={cx(
+                        "w-full cursor-pointer rounded-lg border p-2.5 text-left transition hover:border-primary",
+                        lista?.id === l.id
+                          ? "border-primary bg-primary-soft/40"
+                          : "border-border",
+                      )}
+                    >
+                      <p className="truncate text-sm font-semibold">{l.nome}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <Badge variant={st.variant}>{st.label}</Badge>
+                        <span>
+                          {l.clientes.length} cliente
+                          {l.clientes.length === 1 ? "" : "s"}
+                          {["ENVIANDO", "CONCLUIDA", "CANCELADA"].includes(
+                            l.status,
+                          )
+                            ? ` · ${enviadas} enviada${enviadas === 1 ? "" : "s"}`
+                            : ""}
+                        </span>
+                        {l.midiaTipo &&
+                          (l.midiaTipo === "VIDEO" ? (
+                            <Video className="h-3.5 w-3.5" />
+                          ) : (
+                            <ImagePlus className="h-3.5 w-3.5" />
+                          ))}
+                      </div>
+                      {l.status === "AGENDADA" && l.agendadaPara && (
+                        <p className="mt-1 text-xs text-sky-700">
+                          Para {dataHora(l.agendadaPara)}
+                        </p>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+
+        {/* Listas nichadas salvas */}
+        <Card className="space-y-3 p-4">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <Bookmark className="h-4 w-4 text-primary" /> Listas salvas
+            </h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Quem mais compra de uma categoria ou de um produto. Clique para
+              usar numa lista de envio.
+            </p>
+          </div>
+          {!publicos ? (
+            <Skeleton className="h-20" />
+          ) : !publicos.length ? (
+            <p className="rounded-lg bg-muted/50 p-3 text-center text-xs text-muted-foreground">
+              Recomende clientes por categoria ou produto e clique em “Salvar
+              lista nichada”.
+            </p>
+          ) : (
+            <ul className="max-h-[420px] space-y-1.5 overflow-y-auto">
+              {publicos.map((p) => (
+                <li
+                  key={p.id}
+                  className={cx(
+                    "flex items-start gap-1 rounded-lg border p-2",
+                    publicoAtual === p.id
+                      ? "border-primary bg-primary-soft/40"
+                      : "border-border",
+                  )}
+                >
                   <button
                     type="button"
-                    onClick={() => abrir(l.id)}
-                    className={cx(
-                      "w-full cursor-pointer rounded-lg border p-2.5 text-left transition hover:border-primary",
-                      lista?.id === l.id
-                        ? "border-primary bg-primary-soft/40"
-                        : "border-border",
-                    )}
+                    title="Usar esta lista"
+                    className="min-w-0 flex-1 cursor-pointer text-left"
+                    onClick={() => usarPublico(p)}
                   >
-                    <p className="truncate text-sm font-semibold">{l.nome}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                      <Badge variant={st.variant}>{st.label}</Badge>
-                      <span>
-                        {l.clientes.length} cliente
-                        {l.clientes.length === 1 ? "" : "s"}
-                        {["ENVIANDO", "CONCLUIDA", "CANCELADA"].includes(
-                          l.status,
-                        )
-                          ? ` · ${enviadas} enviada${enviadas === 1 ? "" : "s"}`
-                          : ""}
-                      </span>
-                      {l.midiaTipo &&
-                        (l.midiaTipo === "VIDEO" ? (
-                          <Video className="h-3.5 w-3.5" />
-                        ) : (
-                          <ImagePlus className="h-3.5 w-3.5" />
-                        ))}
-                    </div>
-                    {l.status === "AGENDADA" && l.agendadaPara && (
-                      <p className="mt-1 text-xs text-sky-700">
-                        Para {dataHora(l.agendadaPara)}
-                      </p>
-                    )}
+                    <p className="truncate text-sm font-semibold">{p.nome}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {descreverFiltro(p)} · {p.clientes.length} cliente
+                      {p.clientes.length === 1 ? "" : "s"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Atualizada em {dataHora(p.updatedAt)}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    title="Excluir lista salva"
+                    className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                    onClick={() => excluirPublico(p)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
 
       {!lista ? (
         <Card className="p-6">
@@ -721,6 +999,98 @@ export default function ListasWhatsapp({ conectado }) {
               )}
             </div>
             {editavel && (
+              <div className="grid gap-3 rounded-lg bg-muted/40 p-3 sm:grid-cols-[220px_1fr]">
+                <Field label="Recomendar quem mais compra">
+                  <Select
+                    value={filtro.tipo}
+                    onChange={(e) => mudarTipoFiltro(e.target.value)}
+                  >
+                    <option value="GERAL">De todos os produtos</option>
+                    <option value="CATEGORIA">De uma categoria</option>
+                    <option value="PRODUTO">De um produto específico</option>
+                  </Select>
+                </Field>
+                {filtro.tipo === "CATEGORIA" && (
+                  <Field label="Categoria">
+                    <Select
+                      value={filtro.categoria}
+                      onChange={(e) => {
+                        setFiltro({ ...filtro, categoria: e.target.value });
+                        setAlterada(true);
+                      }}
+                    >
+                      <option value="">Escolha a categoria…</option>
+                      {categorias.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+                {filtro.tipo === "PRODUTO" && (
+                  <Field label="Produto">
+                    {filtro.produtoId ? (
+                      <div className="flex h-10 items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 text-sm">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Package className="h-4 w-4 shrink-0 text-primary" />
+                          <span className="truncate font-medium">
+                            {filtro.produtoNome}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          className="cursor-pointer text-xs font-semibold text-primary hover:underline"
+                          onClick={() => mudarTipoFiltro("PRODUTO")}
+                        >
+                          Trocar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <form className="flex gap-2" onSubmit={buscarProduto}>
+                          <Input
+                            placeholder="Nome ou código (SKU) do produto"
+                            value={buscaProduto}
+                            onChange={(e) => setBuscaProduto(e.target.value)}
+                          />
+                          <Button
+                            type="submit"
+                            variant="outline"
+                            className="shrink-0"
+                            loading={ocupado === "produto"}
+                          >
+                            <Search className="h-4 w-4" />
+                          </Button>
+                        </form>
+                        {produtosAchados.length > 0 && (
+                          <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-card text-sm">
+                            {produtosAchados.map((p) => (
+                              <li key={p.id}>
+                                <button
+                                  type="button"
+                                  className="w-full cursor-pointer px-3 py-2 text-left hover:bg-muted"
+                                  onClick={() => escolherProduto(p)}
+                                >
+                                  <p className="truncate font-medium">
+                                    {p.nome}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {p.sku}
+                                    {p.categoria ? ` · ${p.categoria}` : ""}
+                                  </p>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </Field>
+                )}
+              </div>
+            )}
+            {editavel && (
               <>
                 <Checkbox
                   checked={semRepetir}
@@ -818,6 +1188,8 @@ export default function ListasWhatsapp({ conectado }) {
                           {telefoneBonito(c.telefone)}
                           {c.pedidos > 0 &&
                             ` · ${c.pedidos} pedido${c.pedidos === 1 ? "" : "s"}`}
+                          {c.itens > 0 &&
+                            ` · ${c.itens} pct${c.itens === 1 ? "" : "s"}`}
                         </p>
                         {envio?.erro && (
                           <p className="text-xs text-red-600">{envio.erro}</p>
@@ -840,6 +1212,78 @@ export default function ListasWhatsapp({ conectado }) {
                   );
                 })}
               </ul>
+            )}
+            {editavel && lista.clientes.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                {nomePublico === null ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setNomePublico(
+                          filtro.tipo === "CATEGORIA" && filtro.categoria
+                            ? `Quem mais compra: ${filtro.categoria}`
+                            : filtro.tipo === "PRODUTO" && filtro.produtoNome
+                              ? `Quem mais compra: ${filtro.produtoNome}`
+                              : lista.nome || "Quem mais compra",
+                        )
+                      }
+                    >
+                      <Bookmark className="h-4 w-4" /> Salvar lista nichada
+                    </Button>
+                    {publicoAtual &&
+                      publicos?.some((p) => p.id === publicoAtual) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          loading={ocupado === "publico"}
+                          onClick={() => salvarPublico(true)}
+                          title="Grava os clientes atuais na lista salva que foi usada"
+                        >
+                          <RefreshCw className="h-4 w-4" /> Atualizar “
+                          {publicos.find((p) => p.id === publicoAtual)?.nome}”
+                        </Button>
+                      )}
+                    <span className="text-xs text-muted-foreground">
+                      Guarda estes clientes ({descreverFiltro(filtro)}) para
+                      usar em outros envios.
+                    </span>
+                  </>
+                ) : (
+                  <form
+                    className="flex w-full flex-wrap gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      salvarPublico(false);
+                    }}
+                  >
+                    <Input
+                      className="min-w-56 flex-1"
+                      autoFocus
+                      maxLength={120}
+                      value={nomePublico}
+                      placeholder="Nome da lista salva"
+                      onChange={(e) => setNomePublico(e.target.value)}
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      loading={ocupado === "publico"}
+                    >
+                      <Bookmark className="h-4 w-4" /> Salvar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setNomePublico(null)}
+                    >
+                      Cancelar
+                    </Button>
+                  </form>
+                )}
+              </div>
             )}
           </Card>
 
@@ -1044,8 +1488,9 @@ export default function ListasWhatsapp({ conectado }) {
             {lista.status === "CONCLUIDA" && (
               <p className="text-sm text-emerald-800">
                 Enviada
-                {lista.concluidaEm ? ` em ${dataHora(lista.concluidaEm)}` : ""}:{" "}
-                {lista.resumo?.ENVIADO || 0} entregue(s) ao WhatsApp
+                {lista.concluidaEm
+                  ? ` em ${dataHora(lista.concluidaEm)}`
+                  : ""}: {lista.resumo?.ENVIADO || 0} entregue(s) ao WhatsApp
                 {lista.resumo?.ERRO ? `, ${lista.resumo.ERRO} com erro` : ""}
                 {lista.resumo?.DESCARTADA
                   ? `, ${lista.resumo.DESCARTADA} não enviada(s)`
